@@ -145,6 +145,18 @@ luaShensu = sgs.CreateTriggerSkill{
 	end,
 }
 
+luaShensuSlash = sgs.CreateTargetModSkill{
+	name = "#luaShensu-slash" ,
+	pattern = "Slash" ,
+	distance_limit_func = function(self, player, card)
+		if player:hasSkill("luaShensu") and (card:getSkillName() == "luaShensu") then
+			return 1000
+		else
+			return 0
+		end
+	end,
+}
+
 --[[
 	神智
 	相关武将：标-甘夫人
