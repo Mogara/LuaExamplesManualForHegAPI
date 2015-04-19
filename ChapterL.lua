@@ -80,6 +80,83 @@
 	引用：
 	状态：
 ]]
+
+luaLuoshen = sgs.CreateTriggerSkill{
+	name = "luaLuoshen",
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.EventPhaseStart},
+	can_preshow = false,
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		if player:getPhase() == sgs.Player_Start then return self:objectName() end
+	end,
+	on_cost = function(self, event, room, player, data)
+		return room:askForSkillInvoke(player, self:objectName(), data)
+	end,
+		
+	on_effect = function(self, event, room, player, data)
+		room:broadcastSkillInvoke(self:objectName())
+		room:notifySkillInvoked(player, self:objectName())
+        local judge = sgs.JudgeStruct()
+        judge.pattern = ".|black"
+        judge.good = true;
+        judge.reason = self:objectName()
+        judge.play_animation = false
+        judge.who = player
+        judge.time_consuming = true
+		room:judge(judge)
+
+		while judge:isGood() and player:askForSkillInvoke(self:objectName()) do
+			room:judge(judge)
+		end
+		local cards = sgs.IntList()
+		card_list = player:getTag(self:objectName()):toList()
+		for _, c in sgs.qlist(card_list) do
+			cards:append(c:toCard():getEffectiveId())
+		end
+        player:removeTag(self:objectName())
+        local subcards = sgs.IntList()
+		local dummy = sgs.Sanguosha:cloneCard("slash", sgs.Card_NoSuit, 0)
+        for _, id in sgs.qlist(cards) do
+            if room:getCardPlace(id) == sgs.Player_PlaceTable and not subcards:contains(id) then
+                subcards:append(id)
+				dummy:addSubcard(id)
+			end
+		end
+		if not subcards:isEmpty() then
+			player:obtainCard(dummy)
+		end
+        return false
+	end,
+}
+
+luaLuoshenMove = sgs.CreateTriggerSkill{
+	name = "#luaLuoshen",
+	frequency = sgs.Skill_Compulsory,
+	events = {sgs.FinishJudge},
+	can_trigger = function(self, event, room, player, data)
+		if player then
+			local judge = data:toJudge()
+			if judge.reason == "luaLuoshen" and judge:isGood() then
+				return self:objectName()
+			end
+		end
+	end,
+	on_effect = function(self, event, room, player, data)
+	    local judge = data:toJudge()
+		card_list = player:getTag("luaLuoshen"):toList()
+		local card = sgs.QVariant()
+		card:setValue(judge.card)
+		card_list:append(card)
+		player:setTag("luaLuoshen", sgs.QVariant(card_list))
+		if room:getCardPlace(judge.card:getEffectiveId()) == sgs.Player_PlaceJudge then
+			local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_JUDGEDONE, player:objectName(), "", judge.reason)
+			room:moveCardTo(judge.card, nil, sgs.Player_PlaceTable, reason, true)
+		end
+        return false
+	end,
+}
+
 --[[
 	裸衣
 	相关武将：标-许褚
