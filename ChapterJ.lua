@@ -75,6 +75,60 @@ Luajianxiong = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+luaJieming = sgs.CreateTriggerSkill{
+	name = "luaJieming" ,
+	events = {sgs.Damaged} ,
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local damage = data:toDamage()
+		local trigger_list = {}
+		for i = 1, damage.damage, 1 do
+			table.insert(trigger_list, self:objectName())
+		end
+		return table.concat(trigger_list,",")
+	end,
+	on_cost = function(self, event, room, player, data)
+		if player:isDead() then return false end
+		local target = room:askForPlayerChosen(player, room:getAlivePlayers(), self:objectName(), "jieming-invoke", true, true)
+		if  target then
+			room:notifySkillInvoked(player, self:objectName())
+			if target:objectName() == player:objectName() then
+				room:broadcastSkillInvoke(self:objectName(), 2, player)
+			else
+				room:broadcastSkillInvoke(self:objectName(), 1, player)
+			end
+			local target_list = player:getTag("jieming_target"):toList()
+			local d = sgs.QVariant()
+			d:setValue(target)
+			target_list:append(d)
+			player:setTag("jieming_target", sgs.QVariant(target_list))
+			return true
+		end
+	end,
+		
+	on_effect = function(self, event, room, player, data)
+		local target_list = player:getTag("jieming_target"):toList()
+		target = target_list:last():toPlayer()
+		local d = sgs.QVariant()
+		d:setValue(target)
+		target_list:removeOne(d)
+		player:setTag("jieming_target", sgs.QVariant(target_list))
+		local to
+		for _, p in sgs.qlist(room:getPlayers()) do
+			if p:objectName() == target:objectName() then to = p break end
+		end
+		if to then
+			local upper = math.min(5, to:getMaxHp())
+			local x = upper - to:getHandcardNum()
+			if x <= 0 then
+			else
+				to:drawCards(x)
+			end
+		end
+	end,
+}
+
 --[[
 	结姻
 	相关武将：标-孙尚香
