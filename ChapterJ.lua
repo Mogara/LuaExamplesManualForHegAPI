@@ -89,6 +89,28 @@ Luajianxiong = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+luaJushou = sgs.CreatePhaseChangeSkill{
+	name = "luaJushou",  
+	frequency = sgs.Skill_Frequent,
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		if player:getPhase() == sgs.Player_Finish then return self:objectName() end
+	end,
+	on_cost = function(self, event, room, player, data)
+		return player:askForSkillInvoke(self:objectName(), data)
+	end,
+	
+	on_phasechange = function(self, player)
+		local room = player:getRoom()
+		room:broadcastSkillInvoke(self:objectName())
+		room:notifySkillInvoked(player, self:objectName())
+		player:drawCards(3, self:objectName())
+		player:turnOver()
+		return false
+	end,
+}
+
 --[[
 	巨象
 	相关武将：标-祝融
