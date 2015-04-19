@@ -62,6 +62,33 @@ Luaganglie = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+luaGuanxing = sgs.CreateTriggerSkill{
+	name = "luaGuanxing",
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.EventPhaseStart},
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		if player:getPhase() == sgs.Player_Start then
+			return self:objectName()
+		end
+	end,
+	on_cost = function(self, event, room, player, data)
+		return room:askForSkillInvoke(player, self:objectName(), data)
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		room:broadcastSkillInvoke(self:objectName())
+		room:notifySkillInvoked(player, self:objectName())
+		local count = room:alivePlayerCount()
+		if count > 5 then
+			count = 5
+		end
+		local cards = room:getNCards(count)
+			room:askForGuanxing(player, cards)
+	end,
+}
+
 --[[
 	闺秀
 	相关武将：势-糜夫人
