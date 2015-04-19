@@ -59,6 +59,55 @@
 	引用：
 	状态：
 ]]
+
+LuaLongdan = sgs.CreateViewAsSkill{
+	name = "LuaLongdan" ,
+	n = 1 ,
+	view_filter = function(self, selected, to_select)
+		if #selected > 0 then return false end
+		local card = to_select
+		local usereason = sgs.Sanguosha:getCurrentCardUseReason()
+		if usereason == sgs.CardUseStruct_CARD_USE_REASON_PLAY then
+			return card:isKindOf("Jink")
+		elseif (usereason == sgs.CardUseStruct_CARD_USE_REASON_RESPONSE) or (usereason == sgs.CardUseStruct_CARD_USE_REASON_RESPONSE_USE) then
+			local pattern = sgs.Sanguosha:getCurrentCardUsePattern()
+			if pattern == "slash" then
+				return card:isKindOf("Jink")
+			else
+				return card:isKindOf("Slash")
+			end
+		else
+			return false
+		end
+	end ,
+	
+	view_as = function(self, cards)
+		if #cards ~= 1 then return nil end
+		local originalCard = cards[1]
+		if originalCard:isKindOf("Slash") then
+			local jink = sgs.Sanguosha:cloneCard("jink", originalCard:getSuit(), originalCard:getNumber())
+			jink:addSubcard(originalCard)
+			jink:setSkillName(self:objectName())
+			jink:setShowSkill(self:objectName())
+			return jink
+		elseif originalCard:isKindOf("Jink") then
+			local slash = sgs.Sanguosha:cloneCard("slash", originalCard:getSuit(), originalCard:getNumber())
+			slash:addSubcard(originalCard)
+			slash:setSkillName(self:objectName())
+			slash:setShowSkill(self:objectName())
+			return slash
+		else
+			return nil
+		end
+	end ,
+	enabled_at_play = function(self, target)
+		return sgs.Slash_IsAvailable(target)
+	end,
+	enabled_at_response = function(self, target, pattern)
+		return (pattern == "slash") or (pattern == "jink")
+	end,
+}
+
 --[[
 	乱击
 	相关武将：标-袁绍
