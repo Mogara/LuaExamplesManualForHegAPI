@@ -52,6 +52,59 @@
 	引用：
 	状态：
 ]]
+
+luaQiangxiCard = sgs.CreateSkillCard{
+	name = "luaQiangxiCard", 
+	filter = function(self, targets, to_select) 
+		if #targets ~= 0 then return false end
+		if to_select:objectName() == sgs.Self:objectName() then return false end
+		local rangefix = 0
+		if (not self:getSubcards():isEmpty()) and sgs.Self:getWeapon() and (sgs.Self:getWeapon():getId() == self:getSubcards():first()) then
+			local card = sgs.Self:getWeapon():getRealCard():toWeapon()
+			rangefix = rangefix + card:getRange() - 1
+		end
+		return sgs.Self:distanceTo(to_select, rangefix) <= sgs.Self:getAttackRange()
+	end,
+
+	extra_cost = function(self, room, use)
+		if use.card:getSubcards():isEmpty() then room:loseHp(use.from) end
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_THROW, use.from:objectName(), "", use.card:getSkillName(), "")
+		room:moveCardTo(self, use.from, nil, sgs.Player_PlaceTable, reason, true)
+	end,
+
+	on_effect = function(self, effect)
+		local room = effect.to:getRoom()
+		room:damage(sgs.DamageStruct("luaQiangxi", effect.from, effect.to))
+	end,
+}
+
+luaQiangxi = sgs.CreateViewAsSkill{
+	name = "luaQiangxi",
+	view_filter = function(self, selected, to_select)
+		if #selected == 0 and not sgs.Self:isJilei(to_select) then
+			return to_select:isKindOf("Weapon")
+		end
+		return false
+	end,
+	view_as = function(self, cards) 
+		if #cards == 0 then
+			local card = luaQiangxiCard:clone()
+			card:setShowSkill(self:objectName())
+			return card
+		elseif #cards == 1 then
+			local card = luaQiangxiCard:clone()
+			card:addSubcard(cards[1])
+			card:setShowSkill(self:objectName())
+			return card
+		else
+			return nil
+		end
+	end, 
+	enabled_at_play = function(self, player)
+		return not player:hasUsed("#luaQiangxiCard")
+	end,
+}
+
 --[[
 	倾城
 	相关武将：标-邹氏
