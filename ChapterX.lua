@@ -31,6 +31,35 @@
 	引用：
 	状态：
 ]]
+
+
+luaXingshang = sgs.CreateTriggerSkill{
+	name = "luaXingshang",
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.Death},
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local death = data:toDeath()
+		if death.who:objectName() == player:objectName() or player:isNude() then return false end
+		return self:objectName()
+	end,
+	on_cost = function(self, event, room, player, data)
+		return room:askForSkillInvoke(player, self:objectName(), data)
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		room:broadcastSkillInvoke(self:objectName())
+		room:notifySkillInvoked(player, self:objectName())
+		local death = data:toDeath()
+		if death.who:objectName() == player:objectName() or player:isNude() then return false end
+		local dummy = sgs.Sanguosha:cloneCard("slash", sgs.Card_NoSuit, 0)
+		dummy:addSubcards(death.who:getCards("he"))
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_RECYCLE, player:objectName())
+		room:obtainCard(player, dummy, reason, false)
+		return false
+	end,
+}
+
 --[[
 	雄异
 	相关武将：标-马腾
