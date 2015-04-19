@@ -38,6 +38,46 @@
 	引用：
 	状态：
 ]]
+
+LuaGuicai = sgs.CreateTriggerSkill{
+	name = "LuaGuicai" ,
+	events = {sgs.AskForRetrial} ,
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		if player:isKongcheng() and player:getHandPile():isEmpty() then
+			return "."
+		else return self:objectName()
+		end
+	end,
+		
+	on_cost = function(self, event, room, player, data)
+		local judge = data:toJudge()
+		local room = player:getRoom()
+		local prompt_list = {
+			"@guicai-card" ,
+			judge.who:objectName() ,
+			self:objectName() ,
+			judge.reason ,
+			string.format("%d", judge.card:getEffectiveId())
+            }
+		local prompt = table.concat(prompt_list, ":")
+		local card = room:askForCard(player, ".", prompt,data, sgs.Card_MethodResponse, judge.who, true)
+		if card then
+			room:broadcastSkillInvoke(self:objectName(), player);
+			room:retrial(card, player, judge, self:objectName())
+			return true
+		else
+			return false
+		end
+	end,
+		
+	on_effect = function(self, event, room, player, data)
+		local judge = data:toJudge()
+		judge:updateResult()
+		return false
+	end,
+}
+
 --[[
 	鬼道
 	相关武将：标-张角
