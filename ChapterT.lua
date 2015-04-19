@@ -68,6 +68,70 @@ luaTiandu = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+luatieqi = sgs.CreateTriggerSkill {
+	name = "luatieqi",
+	events = {sgs.TargetChosen},
+	frequency = Frequent,
+	
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local use = data:toCardUse()
+		if not use.card or not use.from then return false end
+		if player:objectName() ~= use.from:objectName() or not use.card:isKindOf("Slash") then return false end			
+		local targets = {}
+		for _, p in sgs.qlist(use.to) do
+			table.insert(targets, p:objectName())
+		end
+		if #targets > 0 then
+			return self:objectName().."->"..table.concat(targets,"+")
+		else return false
+		end
+	end	,
+	
+	on_cost = function(self, event, room, player, data, ask_who)
+		local d = sgs.QVariant()
+		d:setValue(player)
+		return room:askForSkillInvoke(ask_who, self:objectName(), d)
+	end,
+	
+	on_effect = function(self, event, room, player, data, ask_who)
+	    local room = player:getRoom()
+		local use = data:toCardUse()
+		local jink_list = ask_who:getTag("Jink_"..use.card:toString()):toList()
+		local judge = sgs.JudgeStruct()			
+		room:broadcastSkillInvoke(self:objectName(),1,ask_who)
+		local lord = room:getLord(ask_who:getKingdom())
+		local has_lord = false
+		if lord and lord:hasLordSkill("shouyue") and lord:hasShownGeneral1() then
+			has_lord = true
+			judge.pattern = ".|spade"
+			judge.good = false
+		else
+			judge.pattern = ".|red"
+			judge.good = true
+		end
+		judge.reason = self:objectName()
+		judge.who = ask_who
+		if has_lord then room:notifySkillInvoked(lord, "shouyue")
+		else room:notifySkillInvoked(ask_who,self:objectName()) end
+		player:setFlags("TieqiTarget") --for AI			
+		room:judge(judge)			
+		player:setFlags("-TieqiTarget") --for AI
+
+        if judge:isGood() then
+			local log = sgs.LogMessage()
+			log.type = "#NoJink"
+			log.from = player
+			room:sendLog(log)
+			local index = listIndexOf(use.to, player)
+			jink_list:replace(index,sgs.QVariant(0))
+			room:broadcastSkillInvoke(self:objectName(),2,ask_who)
+		end
+		ask_who:setTag("Jink_"..use.card:toString(), sgs.QVariant(jink_list))
+	end,
+}
+
 --[[
 	突袭
 	相关武将：标-张辽
