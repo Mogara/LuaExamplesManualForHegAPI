@@ -54,6 +54,76 @@ luaTiandu = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaTianyiCard = sgs.CreateSkillCard{
+	name = "LuaTianyiCard", 
+	filter = function(self, targets, to_select)
+		return #targets == 0 and (not to_select:isKongcheng()) and to_select:objectName() ~= sgs.Self:objectName()
+	end,
+	extra_cost = function(self, room, use)
+		local pd = sgs.PindianStruct()
+		pd = use.from:pindianSelect(use.to:first(), "LuaTianyi")
+		local d = sgs.QVariant()
+		d:setValue(pd)
+		use.from:setTag("luatianyi_pd", d)
+	end,
+	
+	on_effect = function(self, effect)
+		local pd = effect.from:getTag("luatianyi_pd"):toPindian()
+		effect.from:removeTag("luatianyi_pd")
+		if pd then
+			local success = effect.from:pindian(pd)
+			pd = nil
+			if success then
+				effect.to:getRoom():setPlayerFlag(effect.from, "luaTianyiSuccess")
+			else
+				effect.to:getRoom():setPlayerCardLimitation(effect.from, "use", "Slash", true)
+			end
+		end
+	end,
+}
+
+LuaTianyiVS = sgs.CreateZeroCardViewAsSkill{
+	name = "LuaTianyi",
+	view_as = function(self)
+		local card = LuaTianyiCard:clone()
+		card:setShowSkill(self:objectName())
+		card:setSkillName(self:objectName())
+		return card
+	end, 
+	enabled_at_play = function(self, player)
+		return not player:hasUsed("#LuaTianyiCard") and not player:isKongcheng()
+	end, 
+}
+	
+LuaTianyiTargetMod = sgs.CreateTargetModSkill{
+	name = "#LuaTianyiTargetMod",
+	pattern = "Slash",
+	residue_func = function(self, from, card)
+        if from:hasFlag("luaTianyiSuccess") then
+            return 1
+        else
+            return 0
+		end
+	end,
+	
+	distance_limit_func = function(self, from, card)
+        if from:hasFlag("luaTianyiSuccess") then
+            return 1000
+        else
+            return 0
+		end
+	end,
+	
+	extra_target_func = function(self, from, card)
+        if from:hasFlag("luaTianyiSuccess") then
+            return 1
+        else
+            return 0
+		end
+	end,
+}
+
 --[[
 	挑衅
 	相关武将：阵-姜维
