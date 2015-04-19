@@ -20,6 +20,38 @@
 	状态：
 ]]
 
+LuaFankui = sgs.CreateTriggerSkill{
+	name = "LuaFankui",
+	events = {sgs.Damaged},
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local damage = data:toDamage()
+		if damage.from and not damage.from:isNude() then
+			return self:objectName()
+		end
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local damage = data:toDamage()
+		local room = player:getRoom()
+		local d = sgs.QVariant()
+		d:setValue(damage.from)
+        if player:askForSkillInvoke(self:objectName(), d) then
+            room:broadcastSkillInvoke(self:objectName(), player)
+            room:doAnimate(1, player:objectName(), damage.from:objectName())
+			room:notifySkillInvoked(player, self:objectName())
+            return true
+        end
+    end,
+		
+	on_effect = function(self, event, room, player, data)
+		local damage = data:toDamage()
+		local room = player:getRoom()
+		local card_id = room:askForCardChosen(player, damage.from, "he", self:objectName())
+        room:obtainCard(player, sgs.Sanguosha:getCard(card_id), sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_EXTRACTION, player:objectName(), self:objectName(), ""), false)
+	end
+}
+
 --[[
 	放权
 	相关武将：标-刘禅
