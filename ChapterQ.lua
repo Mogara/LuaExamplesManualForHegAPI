@@ -66,6 +66,20 @@
 	引用：
 	状态：
 ]]
+
+luaQingguo = sgs.CreateOneCardViewAsSkill{
+	name = "luaQingguo", 
+	response_pattern = "jink",
+	filter_pattern = ".|black|.|hand",
+	view_as = function(self, card) 
+		local jink = sgs.Sanguosha:cloneCard("jink",card:getSuit(),card:getNumber())
+		jink:setSkillName(self:objectName())
+		jink:setShowSkill(self:objectName())
+		jink:addSubcard(card:getId())
+		return jink
+	end, 
+}
+
 --[[
 	青囊
 	相关武将：标-华佗
