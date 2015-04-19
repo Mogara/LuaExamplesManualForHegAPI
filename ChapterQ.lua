@@ -94,6 +94,199 @@ luaQingguo = sgs.CreateOneCardViewAsSkill{
 	引用：
 	状态：
 ]]
+
+luaQiaobianCard = sgs.CreateSkillCard{
+	name = "luaQiaobianCard",
+	--target_fixed = false,
+	--will_throw = false,
+	filter = function(self, targets, to_select)
+		local phase = sgs.Self:getMark("qiaobianPhase")
+		if phase == sgs.Player_Draw then
+			if to_select:objectName() ~= sgs.Self:objectName() then
+				if not to_select:isKongcheng() then
+					return #targets < 2
+				end
+			end
+		elseif phase == sgs.Player_Play then
+			if #targets == 0 then
+				if to_select:getJudgingArea():length() > 0 then
+					return true
+				end
+				return to_select:getEquips():length() > 0
+			end
+		end
+		return false
+	end,
+	
+	feasible = function(self, targets)
+		local phase = sgs.Self:getMark("qiaobianPhase")
+		if phase == sgs.Player_Draw then
+			if #targets > 0 then
+				return #targets <= 2
+			end
+		elseif phase == sgs.Player_Play then
+			return #targets == 1
+		end
+		return false
+	end,
+	
+	on_use = function(self, room, source, targets)
+		local phase = source:getMark("qiaobianPhase")
+		if phase == sgs.Player_Draw then
+			if #targets == 0 then return end			
+			local moves = sgs.CardsMoveList()
+			local move1 = sgs.CardsMoveStruct()
+			move1.card_ids:append(room:askForCardChosen(source, targets[1], "h", "luaQiaobian"))
+			move1.to = source
+			move1.to_place = sgs.Player_PlaceHand
+			moves:append(move1)
+			if #targets == 2 then
+				local move2 = sgs.CardsMoveStruct()
+				move2.card_ids:append(room:askForCardChosen(source, targets[2], "h", "luaQiaobian"))
+				move2.to = source
+				move2.to_place = sgs.Player_PlaceHand
+				moves:append(move2)
+			end
+			room:moveCardsAtomic(moves, false)
+					
+		elseif phase == sgs.Player_Play then		
+			if #targets == 0 then return end	
+
+			local from = targets[1]
+			if from:getCards("ej"):isEmpty() then return end
+
+			local card_id = room:askForCardChosen(source, from, "ej", "luaQiaobian")
+			local card = sgs.Sanguosha:getCard(card_id)
+			local place = room:getCardPlace(card_id)
+
+			local equip_index = -1
+			if place == sgs.Player_PlaceEquip then
+				local equip = card:getRealCard():toEquipCard()
+				equip_index = equip:location()
+			end
+			local tos = sgs.SPlayerList()
+			for _,p in sgs.qlist(room:getAlivePlayers()) do
+				if equip_index ~= -1 then
+					if not p:getEquip(equip_index) then
+						tos:append(p)
+					end
+				else
+					if not source:isProhibited(p, card) and not p:containsTrick(card:objectName()) then
+						tos:append(p)
+					end
+				end
+			end
+			
+			local tag = sgs.QVariant()
+			tag:setValue(from)
+			room:setTag("QiaobianTarget", tag)
+			local to = room:askForPlayerChosen(source, tos, "luaQiaobian", "@qiaobian-to:::" .. card:objectName())
+			if to then
+				room:doAnimate(1, from:objectName(), to:objectName())
+				local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TRANSFER, source:objectName(), "luaQiaobian", "")
+				room:moveCardTo(card, from, to, place, reason)
+
+				if place == sgs.Player_PlaceDelayedTrick then
+					local use = sgs.CardUseStruct()
+					use.card = card
+					use.from = nil
+					use.to:append(to)
+					local _data = sgs.QVariant()
+					_data:setValue(use)
+					room:getThread():trigger(sgs.TargetConfirming, room, to, _data)
+					local new_use = _data:toCardUse()
+					if new_use.to:isEmpty() then card:onNullified(to) end
+
+					for _, p in sgs.qlist(room:getAllPlayers()) do
+						room:getThread():trigger(sgs.TargetConfirmed, room, p, _data)
+					end
+				end
+			end
+			room:removeTag("QiaobianTarget")
+		end
+	end,
+}
+
+luaQiaobianVS = sgs.CreateZeroCardViewAsSkill{
+	name = "luaQiaobian",
+	response_pattern = "@@luaQiaobian",
+	view_filter = function(self, selected, to_select)
+		return false
+	end ,
+	view_as = function(self, cards)
+		return luaQiaobianCard:clone()
+	end,
+}
+
+luaQiaobian = sgs.CreateTriggerSkill{
+	name = "luaQiaobian",
+	events = {sgs.EventPhaseChanging},
+	view_as_skill = luaQiaobianVS,
+	can_preshow = true,
+	
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local change = data:toPhaseChange()
+		local nextphase = change.to
+		room:setPlayerMark(player, "qiaobianPhase", nextphase)
+		local index = 0
+		if nextphase == sgs.Player_Judge then
+			index = 1
+		elseif nextphase == sgs.Player_Draw then
+			index = 2
+		elseif nextphase == sgs.Player_Play then
+			index = 3
+		elseif nextphase == sgs.Player_Discard then
+			index = 4
+		end
+		if index > 0 and player:canDiscard(player, "h") then return self:objectName() end
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local change = data:toPhaseChange()
+			local nextphase = change.to
+            local index = 0
+            if nextphase == sgs.Player_Judge then
+                index = 1
+            elseif nextphase == sgs.Player_Draw then
+                index = 2
+            elseif nextphase == sgs.Player_Play then
+                index = 3
+            elseif nextphase == sgs.Player_Discard then
+                index = 4
+            end
+            local discard_prompt = string.format("#qiaobian-%d", index)
+
+        if room:askForDiscard(player, self:objectName(), 1, 1, true, false, discard_prompt, true) then
+            room:broadcastSkillInvoke(self:objectName())
+			room:notifySkillInvoked(player, self:objectName())
+            if not player:isAlive() then return false end
+            if not player:isSkipped(change.to) then return true end
+		end
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local change = data:toPhaseChange()
+		player:skip(change.to)
+		local nextphase = change.to
+		local index = 0
+		if nextphase == sgs.Player_Judge then
+			index = 1
+		elseif nextphase == sgs.Player_Draw then
+			index = 2
+		elseif nextphase == sgs.Player_Play then
+			index = 3
+		elseif nextphase == sgs.Player_Discard then
+			index = 4
+		end
+		if index == 2 or index == 3 then
+            local use_prompt = string.format("@qiaobian-%d", index)
+            room:askForUseCard(player, "@@luaQiaobian", use_prompt, index)
+		end
+        return false
+    end,
+}
+
 --[[
 	驱虎
 	相关武将：标-荀彧
