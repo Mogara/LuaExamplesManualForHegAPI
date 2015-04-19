@@ -36,6 +36,34 @@
 	状态：
 ]]
 
+luaDuanliang = sgs.CreateViewAsSkill{
+	name = "luaDuanliang",
+	n = 1,
+	view_filter = function(self, selected, to_select)
+		return to_select:isBlack() and (to_select:isKindOf("BasicCard") or to_select:isKindOf("EquipCard"))
+	end,
+	view_as = function(self, cards)
+		if #cards ~= 1 then return nil end
+		local shortage = sgs.Sanguosha:cloneCard("supply_shortage",cards[1]:getSuit(),cards[1]:getNumber())
+		shortage:setSkillName(self:objectName())
+		shortage:setShowSkill(self:objectName())
+		shortage:addSubcard(cards[1])
+		return shortage
+	end
+}
+
+luaDuanliangTargetMod = sgs.CreateTargetModSkill{
+	name = "#luaDuanliang-target",
+	pattern = "SupplyShortage",
+	distance_limit_func = function(self, player)
+		if player:hasSkill(self:objectName()) then
+			return 1
+		else
+			return 0
+		end
+	end,
+}
+
 --[[
 	断绁
 	相关武将：势-陈武&董袭
