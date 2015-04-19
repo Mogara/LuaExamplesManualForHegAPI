@@ -52,6 +52,109 @@
 	引用：
 	状态：
 ]]
+
+LuaLiuliCard = sgs.CreateSkillCard{
+	name = "LuaLiuliCard" ,
+	filter = function(self, targets, to_select, player)
+		if #targets > 0 then return false end
+		if to_select:hasFlag("LiuliSlashSource") or (to_select == player) then return false end
+		local from
+		for _, p in sgs.qlist(sgs.Self:getSiblings()) do
+                if p:hasFlag("LiuliSlashSource") then
+                    from = p
+                    break
+                end
+            end
+		local slash = sgs.Card_Parse(sgs.Self:property("liuli"):toString())
+		if from and (not from:canSlash(to_select, slash, false)) then return false end
+		local card_id = self:getSubcards():first()
+		local range_fix = 0
+		if sgs.Self:getWeapon() and (sgs.Self:getWeapon():getId() == card_id) then
+		local weapon = sgs.Self:getWeapon():getRealCard():toWeapon()
+			range_fix = range_fix + weapon:getRange() - 1
+		elseif sgs.Self:getOffensiveHorse() and (sgs.Self:getOffensiveHorse():getId() == card_id) then
+			range_fix = range_fix + 1
+		end
+		return sgs.Self:distanceTo(to_select, range_fix) <= sgs.Self:getAttackRange()
+	end,
+	
+	on_effect = function(self, effect)
+		effect.to:setFlags("LiuliTarget")
+	end,
+}
+
+LuaLiuliVS = sgs.CreateOneCardViewAsSkill{
+	name = "LuaLiuli" ,
+	response_pattern = "@@LuaLiuli",
+	filter_pattern = ".!",
+	view_as = function(self, card)
+		local liuli_card = LuaLiuliCard:clone()
+		liuli_card:addSubcard(card)
+        liuli_card:setShowSkill(self:objectName())
+		liuli_card:setSkillName(self:objectName())
+		return liuli_card
+	end,
+}
+	
+LuaLiuli = sgs.CreateTriggerSkill{
+	name = "LuaLiuli",
+	events = {sgs.TargetConfirming} ,
+	view_as_skill = LuaLiuliVS,
+	can_preshow = true ,
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local room = player:getRoom()
+		local use = data:toCardUse()
+		if use.card and use.card:isKindOf("Slash")
+			and use.to:contains(player) and player:canDiscard(player,"he") then
+			local players = room:getOtherPlayers(player)
+			players:removeOne(use.from)
+			local can_invoke = false
+			for _, p in sgs.qlist(players) do
+				if use.from:canSlash(p, use.card, false) and player:inMyAttackRange(p) then
+					can_invoke = true
+					break
+				end
+			end
+			if can_invoke then return self:objectName() end
+		end
+	end,
+
+	on_cost = function(self, event, room, player, data)
+		local room = player:getRoom()
+		local use = data:toCardUse()
+		local prompt = "@liuli:" .. use.from:objectName()
+		room:setPlayerFlag(use.from, "LiuliSlashSource")
+		d = sgs.QVariant()
+		d:setValue(use.card)
+		player:setTag("liuli-card", d)			--for the server (AI)		
+		room:setPlayerProperty(player, "liuli", sgs.QVariant(use.card:toString()))		--for the client (UI)		
+		local c = room:askForUseCard(player, "@@LuaLiuli", prompt, -1, sgs.Card_MethodDiscard)		
+		player:removeTag("liuli-card")		
+		room:setPlayerProperty(player, "liuli", sgs.QVariant())
+		room:setPlayerFlag(use.from, "-LiuliSlashSource")		
+		if c then return true end
+		return false
+	end,
+		
+	on_effect = function(self, event, room, player, data)
+		local use = data:toCardUse()
+		local players = room:getOtherPlayers(player)
+		for _, p in sgs.qlist(players) do
+			if p:hasFlag("LiuliTarget") then
+				p:setFlags("-LiuliTarget")
+				use.to:removeOne(player)
+				use.to:append(p)
+				room:sortByActionOrder(use.to)
+				data:setValue(use)
+				room:getThread():trigger(sgs.TargetConfirming, room, p, data)
+				return false
+			end
+		end
+		return false
+	end,
+}
+
 --[[
 	龙胆
 	相关武将：标-赵云
