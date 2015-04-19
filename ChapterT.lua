@@ -52,6 +52,70 @@
 	引用：
 	状态：
 ]]
+
+luaTuxiCard = sgs.CreateSkillCard{
+	name = "luaTuxiCard",
+	filter = function(self, targets, to_select)
+		if (#targets >= 2) or (to_select:objectName() == sgs.Self:objectName()) then return false end
+		return not to_select:isKongcheng()
+	end,
+	on_use = function(self, room, player, targets)
+		local target_list = sgs.VariantList()
+		for _, p in ipairs(targets) do
+			local d = sgs.QVariant()
+			d:setValue(p)
+			target_list:append(d)
+		end
+		player:setTag("tuxi_invoke", sgs.QVariant(target_list))
+		player:setFlags("tuxi")
+	end,
+}
+
+luaTuxiVS = sgs.CreateZeroCardViewAsSkill{
+	name = "luaTuxi",
+	response_pattern = "@@luaTuxi",     
+	view_as = function(self)
+		return luaTuxiCard:clone()
+	end,
+}
+
+luaTuxi = sgs.CreatePhaseChangeSkill{
+	name = "luaTuxi" ,
+	view_as_skill = luaTuxiVS,
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) then
+			if player:getPhase() == sgs.Player_Draw then
+				player:removeTag("tuxi_invoke")
+				for _, player in sgs.qlist(room:getOtherPlayers(player)) do
+					if not player:isKongcheng() then
+						return self:objectName()
+					end
+				end			
+			end
+		end
+	end,
+	on_cost = function(self,event,room,player,data)
+		room:askForUseCard(player, "@@luaTuxi", "@tuxi-card")
+		return player:hasFlag("tuxi") and not player:getTag("jtuxi_invoke"):toList():isEmpty()
+	end,
+	
+	on_phasechange = function(self, player)
+		local targets = player:getTag("tuxi_invoke"):toList()
+		
+		player:removeTag("tuxi_invoke")
+		local room = player:getRoom()
+		local moves = sgs.CardsMoveStruct()
+        moves.card_ids:append(room:askForCardChosen(player, targets:at(0):toPlayer(), "h", self:objectName()))
+        moves.to = player
+        moves.to_place = sgs.Player_PlaceHand
+        if targets:length() == 2 then
+            moves.card_ids:append(room:askForCardChosen(player, targets:at(1):toPlayer(), "h", self:objectName()))
+		end
+        room:moveCardsAtomic(moves, false)
+        return true
+	end
+}
+
 --[[
 	屯田
 	相关武将：阵-邓艾
