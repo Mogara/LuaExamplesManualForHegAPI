@@ -10,6 +10,29 @@
 	引用：
 	状态：
 ]]
+luaTiandu = sgs.CreateTriggerSkill{
+	name = "luaTiandu",
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.FinishJudge},
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local judge = data:toJudge()
+		if room:getCardPlace(judge.card:getEffectiveId()) == sgs.Player_PlaceJudge then
+			return self:objectName()
+		end
+	end,
+	on_cost = function(self, event, room, player, data)
+		return player:askForSkillInvoke(self:objectName(), data)
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		room:broadcastSkillInvoke(self:objectName())
+		room:notifySkillInvoked(player, self:objectName())
+		local judge = data:toJudge()
+		player:obtainCard(judge.card)
+	end,
+}
+
 --[[
 	天覆
 	相关武将：阵-姜维
