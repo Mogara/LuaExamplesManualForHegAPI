@@ -87,3 +87,61 @@
 	引用：
 	状态：
 ]]
+
+luaLuoyi = sgs.CreateTriggerSkill{
+	name = "luaLuoyi",
+	frequency = sgs.Skill_NotFrequent,
+	can_preshow = true,
+	events = {sgs.DrawNCards,sgs.DamageCaused,sgs.PreCardUsed},
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		if event == sgs.DrawNCards then
+			return self:objectName()
+		elseif event == sgs.PreCardUsed then
+			if player:hasFlag("luoyi") then
+				local use = data:toCardUse()
+				if use.card and (use.card:isKindOf("Slash") or use.card:isKindOf("Duel")) then
+					room:setCardFlag(use.card, self:objectName())
+				end
+			end
+		else
+			if player:hasFlag("luoyi") then
+				local damage = data:toDamage()
+				if damage.card and damage.card:hasFlag("luoyi") and not damage.chain and not damage.transfer and damage.by_user then
+					return self:objectName()
+				end
+			end
+		end
+	end,
+	
+	on_cost = function(self,event,room,player,data)
+		if event == sgs.DamageCaused then
+			room:broadcastSkillInvoke(self:objectName(), 1, player)
+			return true
+		elseif player:askForSkillInvoke(self:objectName()) then
+            data = data:toInt() - 1
+			room:broadcastSkillInvoke(self:objectName(), 2, player)
+			return true
+		end
+        return false
+	end,
+	
+	on_effect = function(self,event,room,player,data)
+		if event == sgs.DamageCaused then
+		local damage = data:toDamage()
+		
+			local log = sgs.LogMessage()
+			log.type = "#LuoyiBuff"
+            log.from = player
+			log.to:append(damage.to)
+            log.arg = damage.damage
+            log.arg2 = damage.damage + 1
+			room:sendLog(log)
+			
+			damage.damage = damage.damage + 1
+			data:setValue(damage)
+		else
+            room:setPlayerFlag(player, self:objectName())
+		end
+	end,
+}
