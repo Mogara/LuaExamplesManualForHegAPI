@@ -17,6 +17,40 @@
 	引用：
 	状态：
 ]]
+
+luaXiaoguo = sgs.CreateTriggerSkill{
+	name = "luaXiaoguo" ,
+	events = {sgs.EventPhaseStart} ,
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() then return false end
+		if player:getPhase() == sgs.Player_Finish then
+			local yuejin = room:findPlayerBySkillName(self:objectName())
+			if yuejin and yuejin:objectName() ~= player:objectName() and yuejin:canDiscard(yuejin, "h") then
+				yuejin:gainMark("@fog")
+				return self:objectName(), yuejin
+			end
+		end
+	end,
+	on_cost = function(self, event, room, player, data, yuejin)
+		if room:askForCard(yuejin, ".Basic", "@xiaoguo", sgs.QVariant(), self:objectName()) then
+			room:doAnimate(1, yuejin:objectName(), player:objectName())
+			room:broadcastSkillInvoke(self:objectName(), 1, yuejin)
+			room:notifySkillInvoked(yuejin, self:objectName())
+			return true
+		end
+	end,
+
+	on_effect = function(self, event, room, player, data, yuejin)
+		if not room:askForCard(player, ".Equip", "@xiaoguo-discard", sgs.QVariant()) then
+			room:broadcastSkillInvoke(self:objectName(), 2, yuejin)
+			room:damage(sgs.DamageStruct(self:objectName(), yuejin, player))
+		else
+			room:broadcastSkillInvoke(self:objectName(), 3, yuejin)
+		end
+		return false
+	end,
+}
+
 --[[
 	枭姬
 	相关武将：标-孙尚香
