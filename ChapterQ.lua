@@ -347,3 +347,59 @@ luaQiaobian = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+
+luaQuhuCard = sgs.CreateSkillCard{
+	name = "luaQuhuCard",
+	filter = function(self, targets, to_select)
+		return (#targets == 0) and (to_select:getHp() > sgs.Self:getHp()) and (not to_select:isKongcheng())
+	end,
+	extra_cost = function(self, room, use)
+		local pd = sgs.PindianStruct()
+		pd = use.from:pindianSelect(use.to:first(), "luaQuhu")
+		local d = sgs.QVariant()
+		d:setValue(pd)
+		use.from:setTag("luaquhu_pd", d)
+	end,
+	on_effect = function(self, effect)
+		local pd = effect.from:getTag("luaquhu_pd"):toPindian()
+		effect.from:removeTag("luaquhu_pd")
+		if pd then
+			local success = effect.from:pindian(pd)
+			pd = nil
+			local room = effect.to:getRoom()
+			if success then
+				local wolves = sgs.SPlayerList()
+				for _, player in sgs.qlist(room:getOtherPlayers(effect.to)) do
+					if effect.to:inMyAttackRange(player) then
+						wolves:append(player)
+					end
+				end
+				if wolves:isEmpty() then
+					local log = sgs.LogMessage()
+					log.type = "#QuhuNoWolf"
+					log.from = effect.from
+					log.to:append(effect.to)
+					room:sendLog(log)
+					return
+				end
+				local wolf = room:askForPlayerChosen(effect.from, wolves, "luaQuhu", "@quhu-damage:" .. effect.to:objectName())
+				room:damage(sgs.DamageStruct("luaQuhu", effect.to, wolf))
+			else
+				room:damage(sgs.DamageStruct("luaQuhu", effect.to, effect.from))
+			end
+		end
+	end
+}
+
+luaQuhu = sgs.CreateZeroCardViewAsSkill{
+	name = "luaQuhu",
+	view_as = function(self, cards)
+		local card = luaQuhuCard:clone()
+		card:setShowSkill(self:objectName())
+		return card
+	end, 
+	enabled_at_play = function(self, player)
+		return (not player:hasUsed("#luaQuhuCard")) and not player:isKongcheng()
+	end, 
+}
