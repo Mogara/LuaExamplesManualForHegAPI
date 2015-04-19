@@ -17,6 +17,134 @@
 	引用：
 	状态：
 ]]
+
+luaShensuCard = sgs.CreateSkillCard{
+	name = "luaShensuCard" ,
+	filter = function(self, targets, to_select)
+		local targets_list = sgs.PlayerList()
+		for _, target in ipairs(targets) do
+			targets_list:append(target)
+		end
+
+		local slash = sgs.Sanguosha:cloneCard("slash", sgs.Card_NoSuit, 0)
+		slash:setSkillName("luaShensu")
+		slash:deleteLater()
+		return slash:targetFilter(targets_list, to_select, sgs.Self)
+	end ,
+	
+	on_use = function(self, room, source, targets)
+		for _, target in ipairs(targets) do
+			if not source:canSlash(target, nil, false) then
+				targets:removeOne(target)
+            end
+		end
+		if #targets > 0 then
+			local index = "2"
+			if string.endsWith(sgs.Sanguosha:getCurrentCardUsePattern(), "1") then			
+				index = "1"
+			end					
+			local targets_list = sgs.VariantList()
+			for _, target in ipairs(targets) do
+				local d = sgs.QVariant()
+				d:setValue(target)
+				targets_list:append(d)
+			end
+			source:setTag("shensu_invoke" .. index, sgs.QVariant(targets_list))
+			source:setFlags("shensu" .. index)
+		end
+	end,
+}
+
+luaShensuVS = sgs.CreateViewAsSkill{
+	name = "luaShensu",
+	view_filter = function(self, selected, to_select)
+		if string.endsWith(sgs.Sanguosha:getCurrentCardUsePattern(), "1") then 
+			return false
+		else
+			return #selected == 0 and to_select:isKindOf("EquipCard") and not sgs.Self:isJilei(to_select)
+		end
+	end ,
+		
+	view_as = function(self, cards)
+		if string.endsWith(sgs.Sanguosha:getCurrentCardUsePattern(), "1") then
+			if #cards == 0 then
+				local card = luaShensuCard:clone()
+				return card
+			end
+		else
+			if #cards == 1 then
+				local card = luaShensuCard:clone()
+				for _, cd in ipairs(cards) do
+					card:addSubcard(cd)
+				end
+				return card
+			end
+		end
+		return nil
+	end,		
+	enabled_at_play = function()
+		return false
+	end ,
+	enabled_at_response = function(self, player, pattern)
+		return string.startsWith(pattern, "@@luaShensu")
+	end
+}
+
+luaShensu = sgs.CreateTriggerSkill{
+	name = "luaShensu" ,
+	events = {sgs.EventPhaseChanging} ,
+	view_as_skill = luaShensuVS ,
+	can_preshow = true ,
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) or not sgs.Slash_IsAvailable(player) then return false end
+		local change = data:toPhaseChange()
+		if change.to == sgs.Player_Judge and not player:isSkipped(sgs.Player_Judge) and not player:isSkipped(sgs.Player_Draw) then
+			player:removeTag("shensu_invoke1")
+			return self:objectName()
+		elseif change.to == sgs.Player_Play and not player:isSkipped(sgs.Player_Play) and player:canDiscard(player, "he") then
+			player:removeTag("shensu_invoke2")
+			return self:objectName()
+		end
+	end,		
+	on_cost = function(self, event, room, player, data)
+		local change = data:toPhaseChange()
+		if change.to == sgs.Player_Judge and room:askForUseCard(player, "@@luaShensu1", "@shensu1", 1) then
+			if player:hasFlag("shensu1") and not player:getTag("shensu_invoke1"):toList():isEmpty() then
+                player:skip(sgs.Player_Judge)
+                player:skip(sgs.Player_Draw)
+                return true
+			end
+		elseif change.to == sgs.Player_Play and room:askForUseCard(player, "@@luaShensu2", "@shensu2", 2, sgs.Card_MethodDiscard) then
+			if player:hasFlag("shensu2") and not player:getTag("shensu_invoke2"):toList():isEmpty() then
+				player:skip(sgs.Player_Play)
+				return true
+			end
+		end
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local change = data:toPhaseChange()
+		local target_list = sgs.VariantList()
+		if change.to == sgs.Player_Judge then
+			target_list = player:getTag("shensu_invoke1"):toList()
+			player:removeTag("shensu_invoke1")
+		else
+			target_list = player:getTag("shensu_invoke2"):toList()
+			player:removeTag("shensu_invoke2")
+		end
+		local slash = sgs.Sanguosha:cloneCard("slash", sgs.Card_NoSuit, 0)
+		slash:setSkillName("_shensu")
+		local carduse = sgs.CardUseStruct()
+		carduse.card = slash
+		carduse.from = player
+		for i = 0, target_list:length() - 1, 1 do
+            carduse.to:append(target_list:at(i):toPlayer())
+        end
+        room:useCard(carduse)
+        return false
+	end,
+}
+
 --[[
 	神智
 	相关武将：标-甘夫人
