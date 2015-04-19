@@ -17,6 +17,72 @@
 	引用：
 	状态：
 ]]
+
+luaYiji = sgs.CreateTriggerSkill{
+	name = "luaYiji",
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.Damaged},
+	can_trigger = function(self, event, room, player, data)	
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local trigger_list = {}
+		for i = 1, damage.damage, 1 do
+			table.insert(trigger_list, self:objectName())
+		end
+		return table.concat(trigger_list,",")
+	end,
+	on_cost = function(self, event, room, player, data)
+		return room:askForSkillInvoke(player, self:objectName(), data)
+	end,
+	on_effect = function(self, event, room, player, data)
+		local damage = data:toDamage()
+		room:broadcastSkillInvoke(self:objectName())
+		room:notifySkillInvoked(player, self:objectName())
+		local _guojia = sgs.SPlayerList()
+		_guojia:append(player)
+		local yiji_cards = room:getNCards(2, false)
+		local move = sgs.CardsMoveStruct(yiji_cards, nil, player, sgs.Player_PlaceTable, sgs.Player_PlaceHand,
+			sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PREVIEW, player:objectName(), self:objectName(), nil))
+		local moves = sgs.CardsMoveList()
+		moves:append(move)
+		room:notifyMoveCards(true, moves, false, _guojia)
+		room:notifyMoveCards(false, moves, false, _guojia)
+		local origin_yiji = sgs.IntList()
+		for _, id in sgs.qlist(yiji_cards) do
+			origin_yiji:append(id)
+		end
+		while room:askForYiji(player, yiji_cards, self:objectName(), true, false, true, -1, room:getAlivePlayers()) do
+			local move = sgs.CardsMoveStruct(sgs.IntList(), player, nil, sgs.Player_PlaceHand, sgs.Player_PlaceTable,
+				sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PREVIEW, player:objectName(), self:objectName(), nil))
+			for _, id in sgs.qlist(origin_yiji) do
+				if room:getCardPlace(id) ~= sgs.Player_DrawPile then
+					move.card_ids:append(id)
+					yiji_cards:removeOne(id)
+				end
+			end
+			origin_yiji = sgs.IntList()
+			for _, id in sgs.qlist(yiji_cards) do
+				origin_yiji:append(id)
+			end	
+			local moves = sgs.CardsMoveList()
+			moves:append(move)
+			room:notifyMoveCards(true, moves, false, _guojia)
+			room:notifyMoveCards(false, moves, false, _guojia)
+			if not player:isAlive() then return end
+		end
+		if not yiji_cards:isEmpty() then
+			local move = sgs.CardsMoveStruct(yiji_cards, player, nil, sgs.Player_PlaceHand, sgs.Player_PlaceTable,
+				sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PREVIEW, player:objectName(), self:objectName(), nil))
+			local moves = sgs.CardsMoveList()
+			moves:append(move)
+			room:notifyMoveCards(true, moves, false, _guojia)
+			room:notifyMoveCards(false, moves, false, _guojia)
+			for _, id in sgs.qlist(yiji_cards) do
+				player:obtainCard(sgs.Sanguosha:getCard(id), false)
+			end
+		end
+	end,
+}
+
 --[[
 	遗志
 	相关武将：阵-姜维
