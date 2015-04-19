@@ -45,6 +45,29 @@
 	引用：
 	状态：
 ]]
+
+Luajianxiong = sgs.CreateTriggerSkill{
+	name = "Luajianxiong",
+	events = {sgs.Damaged},
+	can_preshow = true,
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isAlive() or player:hasSkill(self:objectName()) then return false end
+		if card and room:getCardPlace(card:getEffectiveId()) == sgs.Player_PlaceTable then
+			return self:objectName()
+		end
+	end,
+	on_cost = function(self,event,room,player,data)
+		return player:askForSkillInvoke(self:objectName(), data)
+	end,
+	on_effect = function(self,event,room,player,data)
+		local damage = data:toDamage()
+		local card = damage.card
+		room:broadcastSkillInvoke(self:objectName())
+		room:notifySkillInvoked(player, self:objectName())
+		player:obtainCard(card)
+	end,
+}
+
 --[[
 	节命
 	相关武将：标-荀彧
