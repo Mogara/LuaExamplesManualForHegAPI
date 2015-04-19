@@ -68,6 +68,38 @@ LuaFankui = sgs.CreateTriggerSkill{
 	状态：
 ]]
 
+luaFangzhu = sgs.CreateTriggerSkill{
+	name = "luaFangzhu",
+	events = {sgs.Damaged},
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		return self:objectName()
+	end,
+	on_cost = function(self, event, room, player, data)
+		local target = room:askForPlayerChosen(player, room:getOtherPlayers(player), self:objectName(),"fangzhu-invoke",true,true)
+		if target then
+			if target:faceUp() then room:broadcastSkillInvoke(self:objectName(), 1, player)
+			else room:broadcastSkillInvoke(self:objectName(), 2, player) end
+			room:notifySkillInvoked(player, self:objectName())
+			local d = sgs.QVariant()
+			d:setValue(target)
+			player:setTag("fangzhu-invoke", d)
+			return true
+		end
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local target = player:getTag("fangzhu-invoke"):toPlayer()
+		if target then
+			if player:isWounded() then
+				local count = player:getLostHp()
+				room:drawCards(target, count, self:objectName())
+			end
+			target:turnOver()
+		end
+	end,
+}
+
 --[[
 	奋命
 	相关武将：势-陈武&董袭
