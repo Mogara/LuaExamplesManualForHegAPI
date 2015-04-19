@@ -10,6 +10,44 @@
 	引用：
 	状态：
 ]]
+
+Luaganglie = sgs.CreateTriggerSkill{
+	name = "Luaganglie",
+	events = {sgs.Damaged},
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then	return false end
+		local damage = data:toDamage()
+		local source = damage.from
+		if source and source:isAlive() then
+			return self:objectName() .. "->" .. damage.from:objectName()
+		end
+	end,
+	
+	on_cost = function(self, event, room, from, data, player)
+		d = sgs.QVariant()
+		d:setValue(from)
+		return room:askForSkillInvoke(player, self:objectName(), d)
+	end,
+	
+	on_effect = function(self, event, room, from, data, player)
+		room:notifySkillInvoked(player,self:objectName())
+		room:broadcastSkillInvoke(self:objectName())
+		local judge = sgs.JudgeStruct()
+		judge.pattern = ".|heart"
+		judge.who = player
+		judge.reason = self:objectName()
+		judge.good = false
+		room:judge(judge)				
+
+		if judge.card:isGood() then
+            if from:getHandcardNum() < 2 or not room:askForDiscard(from, self:objectName(), 2, 2, true) then
+                room:damage(sgs.DamageStruct(self:objectName(), player, from))
+			end
+		end
+	end,
+}
+
+
 --[[
 	固政
 	相关武将：标-张昭&张纮
