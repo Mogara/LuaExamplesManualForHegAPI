@@ -60,32 +60,107 @@ Luaganglie = sgs.CreateTriggerSkill{
 	相关武将：标-诸葛亮
 	描述：准备阶段开始时，你可以观看牌堆顶的X张牌（X为全场角色数且至多为5），然后将其中任意数量的牌以任意顺序置于牌堆顶，其余以任意顺序置于牌堆底。 
 	引用：
-	状态：
+	状态：与姜维遗志的配合有待完善
 ]]
 
-luaGuanxing = sgs.CreateTriggerSkill{
+local json = require ("json")
+luaGuanxing = sgs.CreatePhaseChangeSkill{
 	name = "luaGuanxing",
 	frequency = sgs.Skill_Frequent,
 	events = {sgs.EventPhaseStart},
+	can_preshow = false,
 	can_trigger = function(self, event, room, player, data)
-		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
-		if player:getPhase() == sgs.Player_Start then
+		if player and not player:isDead() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Start then
 			return self:objectName()
 		end
 	end,
-	on_cost = function(self, event, room, player, data)
-		return room:askForSkillInvoke(player, self:objectName(), data)
-	end,
 	
-	on_effect = function(self, event, room, player, data)
+	on_cost = function(self, event, room, player, data)
+        if not player:hasSkill(self:objectName()) then
+            if player:askForSkillInvoke(self:objectName()) then
+                local log = sgs.LogMessage()
+                log.type = "#InvokeSkill";
+                log.from = player
+                log.arg = self:objectName()
+                room:sendLog(log)
+                room:broadcastSkillInvoke("yizhi", player)
+                player:showGeneral(false)
+                return true
+			else
+                return false
+			end
+		end
+        if not player:hasSkill("yizhi") then
+            if player:askForSkillInvoke(self:objectName()) then
+                room:broadcastSkillInvoke(self:objectName(), player)
+                return true
+            else
+                return false
+            end
+        end
+														--运行到这说明两个技能都拥有
+        if player:askForSkillInvoke(self:objectName()) then
+            local show1 = player:hasShownSkill("luaGuanxing")
+            local show2 = player:hasShownSkill("yizhi")
+			local choices = {}
+            if not show1 then
+                table.insert(choices,"show_head_general")
+			end
+            if not show2 then
+                table.insert(choices,"show_deputy_general")
+			end
+            if #choices == 2 then
+                table.insert(choices,"show_both_generals")
+			end
+            if #choices ~= 3 then
+                table.insert(choices,"cancel")
+			end
+            local choice = room:askForChoice(player, "GuanxingShowGeneral", table.concat(choices,"+"))
+            if choice == "cancel" then
+                if show1 then
+                    room:broadcastSkillInvoke(self:objectName(), player)
+                    return true
+				else
+                    room:broadcastSkillInvoke("yizhi", player)
+					--onPhaseChange(player)
+                    return true
+                end
+            end
+            if choice ~= "show_head_general" then
+                player:showGeneral(false)
+			end
+            if (choice == "show_deputy_general" and not show1) then
+                room:broadcastSkillInvoke("yizhi", player)
+                player:showGeneral(false)
+                --onPhaseChange(player)
+                return true
+            else
+                room:broadcastSkillInvoke(self:objectName(), player)
+                return true
+            end
+        end
+        return false
+    end,
+	on_phasechange = function(self,player)
+		local room = player:getRoom()		
 		room:broadcastSkillInvoke(self:objectName())
 		room:notifySkillInvoked(player, self:objectName())
+		
 		local count = room:alivePlayerCount()
-		if count > 5 then
+		if count > 5 or (player:hasShownSkill(self:objectName()) and player:hasShownSkill("yizhi")) then
 			count = 5
 		end
-		local cards = room:getNCards(count)
-			room:askForGuanxing(player, cards)
+		local cards = room:getNCards(count)		
+		local jsonLog = {
+			"$ViewDrawPile",
+			player:objectName(),
+			"",
+			table.concat(sgs.QList2Table(cards),"+"),
+			"",
+			""
+		}
+        room:doNotify(player, sgs.CommandType.S_COMMAND_LOG_SKILL, json.encode(jsonLog))
+		room:askForGuanxing(player, cards, sgs.Room_GuanxingBothSides)
 	end,
 }
 
