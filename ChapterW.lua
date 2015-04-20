@@ -38,6 +38,39 @@
 	引用：
 	状态：
 ]]
+
+--武圣
+LuaWusheng = sgs.CreateOneCardViewAsSkill{
+	name = "LuaWusheng",
+	view_filter = function(self, card)
+		local lord = sgs.Self:getLord()
+        if not lord or not lord:hasLordSkill("shouyue") or not lord:hasShownGeneral1() then
+            if not card:isRed() then return false end
+		end
+		if sgs.Sanguosha:getCurrentCardUseReason() == sgs.CardUseStruct_CARD_USE_REASON_PLAY then
+			local slash = sgs.Sanguosha:cloneCard("slash", sgs.Card_SuitToBeDecided, -1)
+			slash:addSubcard(card:getEffectiveId())
+			slash:deleteLater()
+			return slash:isAvailable(sgs.Self)
+		end
+		return true
+	end,
+	
+	view_as = function(self, originalCard)
+		local slash = sgs.Sanguosha:cloneCard("slash", originalCard:getSuit(), originalCard:getNumber())
+		slash:addSubcard(originalCard:getId())
+		slash:setSkillName(self:objectName())
+		slash:setShowSkill(self:objectName())
+		return slash
+	end,
+	enabled_at_play = function(self, player)
+		return sgs.Slash_IsAvailable(player)
+	end,
+	enabled_at_response = function(self, player, pattern)
+		return pattern == "slash"
+	end,
+}
+
 --[[
 	无双
 	相关武将：标-吕布
