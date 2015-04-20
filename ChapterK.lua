@@ -24,6 +24,35 @@
 	引用：
 	状态：
 ]]
+
+LuaKongcheng = sgs.CreateTriggerSkill{
+	name = "LuaKongcheng",
+	events = {sgs.TargetConfirming},
+	frequency = sgs.Skill_Compulsory,
+
+    can_trigger = function(self,event,room,player,data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+        if player:isKongcheng() then
+            local use = data:toCardUse()
+            if use.card and (use.card:isKindOf("Slash") or use.card:isKindOf("Duel")) and use.to:contains(player) then
+                return self:objectName()
+			end
+		end
+	end,
+    on_cost = function(self,event,room,player,data)
+        if player:hasShownSkill(self) or player:askForSkillInvoke(self) then
+            room:broadcastSkillInvoke(self:objectName(), player)
+            return true
+		end
+	end,
+    on_effect = function(self,event,room,player,data)
+        room:sendCompulsoryTriggerLog(player, self:objectName(),true)
+        local use = data:toCardUse()
+        sgs.Room_cancelTarget(use, player)
+        data:setValue(use)
+	end,
+}
+
 --[[
 	苦肉
 	相关武将：标-黄盖
