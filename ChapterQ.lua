@@ -10,6 +10,20 @@
 	引用：
 	状态：
 ]]
+
+LuaQicai = sgs.CreateTargetModSkill{
+	name = "LuaQicai",
+	pattern = "TrickCard",
+	distance_limit_func = function(self, from, card)
+		if not sgs.Sanguosha:matchExpPattern("TrickCard", from, card) then return 0 end
+		if from:hasSkill(self:objectName()) then
+			return 1000
+		else
+			return 0
+		end
+	end,
+}
+
 --[[
 	戚乱
 	相关武将：阵-何太后
