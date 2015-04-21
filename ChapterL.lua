@@ -38,6 +38,67 @@
 	引用：
 	状态：
 ]]
+
+LuaLiegong = sgs.CreateTriggerSkill{
+	name = "LuaLiegong",
+	events = {sgs.TargetChosen},
+
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local use = data:toCardUse()
+		if not use.card or not use.from then return false end
+		if player:objectName() ~= use.from:objectName() or not use.card:isKindOf("Slash") then return false end			
+		local targets = {}
+		for _, p in sgs.qlist(use.to) do
+			if p:getHandcardNum() >= player:getHp() or p:getHandcardNum() <= player:getAttackRange() then
+				table.insert(targets, p:objectName())
+			end
+		end
+		if #targets > 0 then
+			return self:objectName().."->"..table.concat(targets,"+")
+		else return false
+		end
+	end	,
+	on_cost = function(self, event, room, target, data, player)
+		local d = sgs.QVariant()
+		d:setValue(target)
+		return room:askForSkillInvoke(player, self:objectName(), d)
+	end,
+	on_effect = function(self, event, room, target, data, player)
+		room:broadcastSkillInvoke(self:objectName(), 1, player)
+		local use = data:toCardUse()
+		local jink_list = player:getTag("Jink_"..use.card:toString()):toList()
+		local log = sgs.LogMessage()
+		log.type = "#NoJink"
+		log.from = target
+		room:sendLog(log)
+		local index = listIndexOf(use.to, target)
+		jink_list:replace(index,sgs.QVariant(0))
+		player:setTag("Jink_"..use.card:toString(), sgs.QVariant(jink_list))
+	end,
+}
+
+--[[
+	烈弓 ——【授钺】之五虎将大旗
+	相关武将：标-黄忠
+	描述：烈弓的距离 +1。
+	引用：
+	状态：
+]]
+
+LuaLiegongRange = sgs.CreateAttackRangeSkill{
+	name = "#LuaLiegong-for-lord",
+	extra_func = function(self, target)
+		if target:hasShownSkill("LuaLiegong") then
+			local lord = target:getLord()
+			if lord and lord:hasLordSkill("shouyue") and lord:hasShownGeneral1() then
+                return 1
+			end
+		end
+        return 0
+	end,
+}
+
 --[[
 	烈刃
 	相关武将：标-祝融
