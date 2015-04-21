@@ -60,9 +60,9 @@ Luaganglie = sgs.CreateTriggerSkill{
 	相关武将：标-诸葛亮
 	描述：准备阶段开始时，你可以观看牌堆顶的X张牌（X为全场角色数且至多为5），然后将其中任意数量的牌以任意顺序置于牌堆顶，其余以任意顺序置于牌堆底。 
 	引用：
-	状态：与姜维遗志的配合有待完善
+	状态：
+	备注：配合的“遗志”是"LuaYizhi"注意不要与原生的混淆了
 ]]
-
 local json = require ("json")
 luaGuanxing = sgs.CreatePhaseChangeSkill{
 	name = "luaGuanxing",
@@ -83,14 +83,14 @@ luaGuanxing = sgs.CreatePhaseChangeSkill{
                 log.from = player
                 log.arg = self:objectName()
                 room:sendLog(log)
-                room:broadcastSkillInvoke("yizhi", player)
+                room:broadcastSkillInvoke("LuaYizhi", player)
                 player:showGeneral(false)
                 return true
 			else
                 return false
 			end
 		end
-        if not player:hasSkill("yizhi") then
+        if not player:hasSkill("LuaYizhi") then
             if player:askForSkillInvoke(self:objectName()) then
                 room:broadcastSkillInvoke(self:objectName(), player)
                 return true
@@ -100,53 +100,55 @@ luaGuanxing = sgs.CreatePhaseChangeSkill{
         end
 														--运行到这说明两个技能都拥有
         if player:askForSkillInvoke(self:objectName()) then
-		local show1 = player:hasShownSkill("luaGuanxing")
-		local show2 = player:hasShownSkill("yizhi")
-		local choices = {}
-		if not show1 then
-			table.insert(choices,"show_head_general")
-		end
-		if not show2 then
-                	table.insert(choices,"show_deputy_general")
-		end
-		if #choices == 2 then
-                	table.insert(choices,"show_both_generals")
-		end
-		if #choices ~= 3 then
-                	table.insert(choices,"cancel")
-		end
-		local choice = room:askForChoice(player, "GuanxingShowGeneral", table.concat(choices,"+"))
-		if choice == "cancel" then
-			if show1 then
-                		room:broadcastSkillInvoke(self:objectName(), player)
-                    		return true
-			else
+            local show1 = player:hasShownSkill("luaGuanxing")
+            local show2 = player:hasShownSkill("LuaYizhi")
+			local choices = {}
+            if not show1 then
+                table.insert(choices,"show_head_general")
+			end
+            if not show2 then
+                table.insert(choices,"show_deputy_general")
+			end
+            if #choices == 2 then
+                table.insert(choices,"show_both_generals")
+			end
+            if #choices ~= 3 then
+                table.insert(choices,"cancel")
+			end
+            local choice = room:askForChoice(player, "GuanxingShowGeneral", table.concat(choices,"+"))
+            if choice == "cancel" then
+                if show1 then
+                    room:broadcastSkillInvoke(self:objectName(), player)
+                    return true
+				else
+                    room:broadcastSkillInvoke("LuaYizhi", player)
+					self:effect(sgs.EventPhaseStart, room, player, data)
+					return false
+                end
+            end
+            if choice ~= "show_head_general" then
+                player:showGeneral(false)
+			end
+            if (choice == "show_deputy_general" and not show1) then
+                room:broadcastSkillInvoke("LuaYizhi", player)
+                player:showGeneral(false)
+                --onPhaseChange(player)
 				self:effect(sgs.EventPhaseStart, room, player, data)
 				return false
-                	end
-            	end
-		if choice ~= "show_head_general" then
-                	player:showGeneral(false)
-		end
-		if (choice == "show_deputy_general" and not show1) then
-			room:broadcastSkillInvoke("yizhi", player)
-                	player:showGeneral(false)
-			self:effect(sgs.EventPhaseStart, room, player, data)
-			return false
-            	else
-                	room:broadcastSkillInvoke(self:objectName(), player)
-                	return true
-            	end
-        	end
-        	return false
-	end,
+            else
+                room:broadcastSkillInvoke(self:objectName(), player)
+                return true
+            end
+        end
+        return false
+    end,
 	on_phasechange = function(self,player)
 		local room = player:getRoom()		
 		room:broadcastSkillInvoke(self:objectName())
 		room:notifySkillInvoked(player, self:objectName())
 		
 		local count = room:alivePlayerCount()
-		if count > 5 or (player:hasShownSkill(self:objectName()) and player:hasShownSkill("yizhi")) then
+		if count > 5 or (player:hasShownSkill(self:objectName()) and player:hasShownSkill("LuaYizhi")) then
 			count = 5
 		end
 		local cards = room:getNCards(count)		
@@ -162,7 +164,6 @@ luaGuanxing = sgs.CreatePhaseChangeSkill{
 		room:askForGuanxing(player, cards, sgs.Room_GuanxingBothSides)
 	end,
 }
-
 --[[
 	闺秀
 	相关武将：势-糜夫人
