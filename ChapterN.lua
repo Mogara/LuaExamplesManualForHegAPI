@@ -17,3 +17,50 @@
 	引用：
 	状态：
 ]]
+
+LuaNiepan = sgs.CreateTriggerSkill{
+	name = "LuaNiepan",
+	events = {sgs.AskForPeaches},
+	frequency = sgs.Skill_Limited,
+	limit_mark = "@nirvana",
+
+   can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+        if player:getMark("@nirvana") > 0 then
+			local dying_data = data:toDying()
+			if player:getHp() > 0 then return false end
+			if dying_data.who:objectName() ~= player:objectName() then return false end
+			return self:objectName()
+		end
+	end,
+
+    on_cost = function(self, event, room, pangtong, data)
+		if pangtong:askForSkillInvoke(self, data) then
+			room:broadcastSkillInvoke(self:objectName(), pangtong)
+			room:doSuperLightbox("pangtong", self:objectName())
+			return true
+		end
+	end,
+    on_effect = function(self, event, room, pangtong, data)
+		room:removePlayerMark(pangtong, "@nirvana")
+		pangtong:throwAllHandCardsAndEquips()
+		local tricks = pangtong:getJudgingArea()
+		for _, trick in sgs.qlist(tricks) do
+			local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_NATURAL_ENTER, pangtong:objectName())
+            room:throwCard(trick, reason, nil)
+		end
+
+		local recover = sgs.RecoverStruct()
+        recover.recover = math.min(3, pangtong:getMaxHp()) - pangtong:getHp()
+		room:recover(pangtong, recover)
+
+		pangtong:drawCards(3)
+
+		if pangtong:isChained() then
+			room:setPlayerProperty(pangtong, "chained", false)
+		end
+        if not pangtong:faceUp() then
+			pangtong:turnOver()
+		end
+	end,
+}
