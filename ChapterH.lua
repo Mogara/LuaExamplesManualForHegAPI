@@ -68,6 +68,23 @@
 	引用：
 	状态：
 ]]
+
+LuaHuoji = sgs.CreateOneCardViewAsSkill{
+	name = "LuaHuoji",
+	filter_pattern = ".|red|.|hand",
+	response_or_use = true,
+	view_as = function(self, card)
+		local suit = card:getSuit()
+		local point = card:getNumber()
+		local id = card:getId()
+		local fireattack = sgs.Sanguosha:cloneCard("FireAttack", suit, point)
+		fireattack:setSkillName(self:objectName())
+		fireattack:setShowSkill(self:objectName())
+		fireattack:addSubcard(id)
+		return fireattack
+	end
+}
+
 --[[
 	祸首
 	相关武将：标-孟获
