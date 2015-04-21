@@ -163,11 +163,10 @@ LuaLiuli = sgs.CreateTriggerSkill{
 	状态：
 ]]
 
-LuaLongdan = sgs.CreateViewAsSkill{
+LuaLongdanVS = sgs.CreateOneCardViewAsSkill{
 	name = "LuaLongdan" ,
-	n = 1 ,
-	view_filter = function(self, selected, to_select)
-		if #selected > 0 then return false end
+	response_or_use = true,
+	view_filter = function(self, to_select)
 		local card = to_select
 		local usereason = sgs.Sanguosha:getCurrentCardUseReason()
 		if usereason == sgs.CardUseStruct_CARD_USE_REASON_PLAY then
@@ -182,11 +181,9 @@ LuaLongdan = sgs.CreateViewAsSkill{
 		else
 			return false
 		end
-	end ,
+	end,
 	
-	view_as = function(self, cards)
-		if #cards ~= 1 then return nil end
-		local originalCard = cards[1]
+	view_as = function(self, originalCard)
 		if originalCard:isKindOf("Slash") then
 			local jink = sgs.Sanguosha:cloneCard("jink", originalCard:getSuit(), originalCard:getNumber())
 			jink:addSubcard(originalCard)
@@ -208,6 +205,44 @@ LuaLongdan = sgs.CreateViewAsSkill{
 	end,
 	enabled_at_response = function(self, target, pattern)
 		return (pattern == "slash") or (pattern == "jink")
+	end,
+}
+
+--[[
+	龙胆 ——【授钺】之五虎将大旗
+	相关武将：标-赵云
+	描述：“龙胆”增加描述：“你每发动一次‘龙胆’便摸一张牌”。
+	引用：
+	状态：
+]]
+
+LuaLongdan = sgs.CreateTriggerSkill{
+	name = "LuaLongdan" ,
+	events = {sgs.CardUsed,sgs.CardResponded},
+	view_as_skill = LuaLongdanVS,
+
+	can_trigger = function(self,event,room,player,data)
+		if not player or player:isDead() or not player:hasShownSkill(self) then return false end
+        local lord = room:getLord(player:getKingdom())
+        if lord and lord:hasLordSkill("shouyue") and lord:hasShownGeneral1() then
+			local card
+            if event == sgs.CardUsed then
+                card = data:toCardUse().card
+            else
+                card = data:toCardResponse().m_card
+			end
+            if card and card:getSkillName() == "LuaLongdan" then
+                return self:objectName()
+			end
+		end
+	end,
+	on_cost = function(self,event,room,player,data)
+		return true
+	end,
+	on_effect = function(self,event,room,player,data)
+        local lord = room:getLord(player:getKingdom())
+        room:notifySkillInvoked(lord, "shouyue")
+        player:drawCards(1)
 	end,
 }
 
