@@ -74,3 +74,49 @@ LuaKongcheng = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+
+LuaKuanggu = sgs.CreateTriggerSkill{
+	name = "LuaKuanggu",
+	events = {sgs.PreDamageDone,sgs.Damage},
+	frequency = sgs.Skill_Compulsory,
+
+	can_trigger = function(self, event, room, player, data)
+		if event == sgs.PreDamageDone then
+			local damage = data:toDamage()
+			local weiyan = damage.from
+            if weiyan and weiyan:hasSkill(self:objectName()) then
+				if weiyan:distanceTo(damage.to) ~= -1 and weiyan:distanceTo(damage.to) <= 1 then
+                    weiyan:setTag("InvokeKuanggu", sgs.QVariant(damage.damage))
+                else
+                    weiyan:removeTag("InvokeKuanggu")
+				end
+			end
+		else			
+			if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+			local recorded_damage = player:getTag("InvokeKuanggu"):toInt()
+			if recorded_damage and recorded_damage > 0 and player:isWounded() then
+				local skill_list = {}
+				local damage = data:toDamage()
+				for i = 1, damage.damage, 1 do
+					table.insert(skill_list, self:objectName())
+				end
+                return table.concat(skill_list, ",")
+			end
+		end
+	end,
+
+	on_cost = function(self, event, room, player, data)
+		if player:hasShownSkill(self:objectName()) or player:askForSkillInvoke(self:objectName()) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+            return true
+		end
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		room:sendCompulsoryTriggerLog(player, self:objectName(), true)
+        local recover = sgs.RecoverStruct()
+		recover.who = player
+		room:recover(player, recover)
+	end,
+}
