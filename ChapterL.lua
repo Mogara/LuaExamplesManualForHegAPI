@@ -31,6 +31,20 @@
 	引用：
 	状态：
 ]]
+
+LuaLianhuan = sgs.CreateOneCardViewAsSkill{
+	name = "LuaLianhuan",
+	filter_pattern = ".|club|.|hand",
+	response_or_use = true,
+	view_as = function(self, originalCard)
+		local chain = sgs.Sanguosha:cloneCard("iron_chain", originalCard:getSuit(), originalCard:getNumber())
+        chain:addSubcard(originalCard)
+        chain:setSkillName(self:objectName())
+        chain:setShowSkill(self:objectName())
+        return chain
+	end,
+}
+
 --[[
 	烈弓
 	相关武将：标-黄忠
