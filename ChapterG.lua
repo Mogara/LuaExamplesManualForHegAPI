@@ -100,47 +100,46 @@ luaGuanxing = sgs.CreatePhaseChangeSkill{
         end
 														--运行到这说明两个技能都拥有
         if player:askForSkillInvoke(self:objectName()) then
-            local show1 = player:hasShownSkill("luaGuanxing")
-            local show2 = player:hasShownSkill("yizhi")
-			local choices = {}
-            if not show1 then
-                table.insert(choices,"show_head_general")
-			end
-            if not show2 then
-                table.insert(choices,"show_deputy_general")
-			end
-            if #choices == 2 then
-                table.insert(choices,"show_both_generals")
-			end
-            if #choices ~= 3 then
-                table.insert(choices,"cancel")
-			end
-            local choice = room:askForChoice(player, "GuanxingShowGeneral", table.concat(choices,"+"))
-            if choice == "cancel" then
-                if show1 then
-                    room:broadcastSkillInvoke(self:objectName(), player)
-                    return true
-				else
-                    room:broadcastSkillInvoke("yizhi", player)
-					--onPhaseChange(player)
-                    return true
-                end
-            end
-            if choice ~= "show_head_general" then
-                player:showGeneral(false)
-			end
-            if (choice == "show_deputy_general" and not show1) then
-                room:broadcastSkillInvoke("yizhi", player)
-                player:showGeneral(false)
-                --onPhaseChange(player)
-                return true
-            else
-                room:broadcastSkillInvoke(self:objectName(), player)
-                return true
-            end
-        end
-        return false
-    end,
+		local show1 = player:hasShownSkill("luaGuanxing")
+		local show2 = player:hasShownSkill("yizhi")
+		local choices = {}
+		if not show1 then
+			table.insert(choices,"show_head_general")
+		end
+		if not show2 then
+                	table.insert(choices,"show_deputy_general")
+		end
+		if #choices == 2 then
+                	table.insert(choices,"show_both_generals")
+		end
+		if #choices ~= 3 then
+                	table.insert(choices,"cancel")
+		end
+		local choice = room:askForChoice(player, "GuanxingShowGeneral", table.concat(choices,"+"))
+		if choice == "cancel" then
+			if show1 then
+                		room:broadcastSkillInvoke(self:objectName(), player)
+                    		return true
+			else
+				self:effect(sgs.EventPhaseStart, room, player, data)
+				return false
+                	end
+            	end
+		if choice ~= "show_head_general" then
+                	player:showGeneral(false)
+		end
+		if (choice == "show_deputy_general" and not show1) then
+			room:broadcastSkillInvoke("yizhi", player)
+                	player:showGeneral(false)
+			self:effect(sgs.EventPhaseStart, room, player, data)
+			return false
+            	else
+                	room:broadcastSkillInvoke(self:objectName(), player)
+                	return true
+            	end
+        	end
+        	return false
+	end,
 	on_phasechange = function(self,player)
 		local room = player:getRoom()		
 		room:broadcastSkillInvoke(self:objectName())
