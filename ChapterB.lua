@@ -11,6 +11,27 @@
 	状态：
 ]]
 
+LuaBazhen = sgs.CreateTriggerSkill{
+	name = "LuaBazhen",
+	frequency = sgs.Skil_Compulsory,
+	events = {sgs.CardAsked},
+
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local pattern = data:toStringList()[1]
+		if pattern ~= "jink" then return false end
+		local qinggang = player:getTag("Qinggang"):toStringList()
+		if #qinggang ~= 0 or player:getMark("Armor_Nullified") > 0 or player:getMark("Equips_Nullified_to_Yourself") > 0 then return false end
+		--if player:hasArmorEffect("bazhen") then --这个东西在源代码里，无法100%还原
+		if not player:getArmor() and not player:hasArmorEffect("bazhen") then
+			return "EightDiagram"
+		end
+	end,
+    on_cost = function(self, event, room, player, data)
+		return false
+	end,
+}
+
 --[[
 	暴凌
 	相关武将：势-董卓
