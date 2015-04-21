@@ -89,7 +89,34 @@ luaYiji = sgs.CreateTriggerSkill{
 	描述：副将技，此武将牌上单独的阴阳鱼个数-1；副将技，若你的主将有“观星”，此“观星”描述中的X视为5，否则你视为拥有“观星”。 
 	引用：
 	状态：
+	备注：阴阳鱼减少不在技能里
 ]]
+
+LuaYizhi = sgs.CreateTriggerSkill{
+	name = "LuaYizhi",
+	relate_to_place = "deputy",
+	frequency = sgs.Skill_Compulsory;
+	events = {sgs.GameStart,sgs.EventPhaseStart},
+	can_preshow = false,
+	can_trigger = function(self,event,room,player,data)
+		if not player or player:isDead() or not player:hasSkill(self) then return false end
+		if event == sgs.GameStart then
+			local guanxing = sgs.Sanguosha:getSkill("luaGuanxing")
+			if guanxing and guanxing:inherits("TriggerSkill") then
+				local guanxing_trigger = sgs.Sanguosha:getTriggerSkill("luaGuanxing")
+				room:getThread():addTriggerSkill(guanxing_trigger)
+			end
+		elseif event == sgs.EventPhaseStart and player:getPhase() == sgs.Player_Start then
+            if not player:hasSkill("luaGuanxing") then
+                return "luaGuanxing"
+			end
+		end
+	end,
+	on_cost = function(self,event,room,player,data)
+		return false
+	end,
+}
+
 --[[
 	英魂
 	相关武将：标-孙坚、势-孙策
