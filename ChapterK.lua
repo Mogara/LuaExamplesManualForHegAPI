@@ -10,6 +10,27 @@
 	引用：
 	状态：
 ]]
+
+LuaKanpo = sgs.CreateOneCardViewAsSkill{
+	name = "LuaKanpo",
+	filter_pattern = ".|black|.|hand",
+	response_pattern = "nullification",
+	response_or_use = true,
+	view_as = function(self, first)
+		local ncard = sgs.Sanguosha:cloneCard("nullification", first:getSuit(), first:getNumber())
+		ncard:addSubcard(first)
+		ncard:setSkillName(self:objectName())
+		ncard:setShowSkill(self:objectName())
+		return ncard
+	end,
+	enabled_at_nullification = function(self, player)
+		for _, card in sgs.qlist(player:getHandcards()) do
+			if card:isBlack() then return true end
+		end
+		return false
+	end,
+}
+
 --[[
 	克己
 	相关武将：标-吕蒙
