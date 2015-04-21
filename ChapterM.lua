@@ -10,6 +10,16 @@
 	引用：
 	状态：
 ]]
+
+LuaMashu = sgs.CreateDistanceSkill{
+	name = "LuaMashu",
+	correct_func = function(self, from, to)
+		if from:hasSkill("LuaMashu") and from:hasShownSkill(self:objectName()) then
+			return -1
+		end
+	end,
+}
+
 --[[
 	猛进
 	相关武将：标-庞德
