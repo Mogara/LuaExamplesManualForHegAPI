@@ -38,6 +38,38 @@
 	引用：
 	状态：
 ]]
+
+LuaJizhi = sgs.CreateTriggerSkill{
+	name = "LuaJizhi",
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.CardUsed},
+
+    can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local use = data:toCardUse()
+        if use.card and use.card:isNDTrick() then
+            if not use.card:isVirtualCard() or use.card:getSubcards():isEmpty() then
+				return self:objectName()
+            elseif use.card:getSubcards():length() == 1 then
+                if sgs.Sanguosha:getCard(use.card:getEffectiveId()):objectName() == use.card:objectName() then
+					return self:objectName()
+				end
+			end
+		end
+	end,
+
+	on_cost = function(self, event, room, player, data)
+        if player:askForSkillInvoke(self:objectName(), data) then
+            room:broadcastSkillInvoke(self:objectName(), player)
+            return true
+		end
+	end,
+
+	on_effect = function(self, event, room, player, data)
+        player:drawCards(1)
+	end,
+}
+
 --[[
 	奸雄
 	相关武将：标-曹操
