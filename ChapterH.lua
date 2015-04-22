@@ -107,17 +107,17 @@ LuaSavageAssaultAvoid = sgs.CreateTriggerSkill{
 	end,
 	on_cost = function(self, event, room, player, data)
 		if player:hasShownSkill("LuaHuoshou") or player:askForSkillInvoke("LuaHuoshou") then
-			room:broadcastSkillInvoke(self:objectName(), 1, player)
-			player:showGeneral(player:inHeadSkills(self:objectName()))
+			room:broadcastSkillInvoke("LuaHuoshou", 1, player)
+			player:showGeneral(player:inHeadSkills("LuaHuoshou"))
 			return true
 		end
 	end,
 	on_effect = function(self, event, room, player, data)
-		room:notifySkillInvoked(player, self:objectName())
+		room:notifySkillInvoked(player, "LuaHuoshou")
 		local log = sgs.LogMessage()
 		log.type = "#SkillNullify"
 		log.from = player
-		log.arg = self:objectName()
+		log.arg = "LuaHuoshou"
 		log.arg2 = "savage_assault"
 		room:sendLog(log)
 		return true
