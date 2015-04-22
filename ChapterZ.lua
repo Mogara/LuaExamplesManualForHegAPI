@@ -10,6 +10,66 @@
 	引用：
 	状态：
 ]]
+
+LuaZaiqi = sgs.CreatePhaseChangeSkill{
+	name = "LuaZaiqi",
+	frequency = sgs.Skill_Frequent,
+
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+
+		if player:getPhase() == sgs.Player_Draw and player:isWounded() then
+			return self:objectName()
+		end
+	end,
+
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self) then
+			room:broadcastSkillInvoke(self:objectName(), 1, player)
+			return true
+		end
+	end,
+	on_phasechange = function(self, menghuo)
+		local room = menghuo:getRoom()
+		local has_heart = false
+		local x = menghuo:getLostHp()
+		local ids = room:getNCards(x, false)
+		local move = sgs.CardsMoveStruct(ids, menghuo, sgs.Player_PlaceTable, sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TURNOVER, menghuo:objectName(), "LuaZaiqi", ""))
+		room:moveCardsAtomic(move, true)
+
+		room:getThread():delay()
+		room:getThread():delay()
+
+		local card_to_throw,card_to_gotback = sgs.IntList(),sgs.IntList()
+		for i = 0, x - 1, 1 do
+			if sgs.Sanguosha:getCard(ids:at(i)):getSuit() == sgs.Card_Heart then
+				card_to_throw:append(ids:at(i))
+            else
+				card_to_gotback:append(ids:at(i))
+			end
+		end
+		if not card_to_throw:isEmpty() then
+			local dummy = sgs.DummyCard(card_to_throw)
+			local recover = sgs.RecoverStruct()
+			recover.who = menghuo;
+			recover.recover = card_to_throw:length()
+			room:recover(menghuo, recover)
+			reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_NATURAL_ENTER, menghuo:objectName(), "LuaZaiqi", "")
+			room:throwCard(dummy, reason, nil)
+            has_heart = true
+		end
+		if not card_to_gotback:isEmpty() then
+			local dummy2 = sgs.DummyCard(card_to_gotback)
+            reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_GOTBACK, menghuo:objectName())
+            room:obtainCard(menghuo, dummy2, reason)
+		end
+		if has_heart then
+            room:broadcastSkillInvoke(self:objectName(), 2, menghuo)
+		end
+		return true
+	end,
+}
+
 --[[
 	章武
 	相关武将：阵-君刘备
