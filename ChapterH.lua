@@ -92,6 +92,85 @@ LuaHuoji = sgs.CreateOneCardViewAsSkill{
 	引用：
 	状态：
 ]]
+
+LuaSavageAssaultAvoid = sgs.CreateTriggerSkill{
+	name = "#LuaSavageAssaultAvoid",
+    events = {sgs.CardEffected},
+    frequency = sgs.Skill_Compulsory,
+
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill("LuaHuoshou") then return false end
+		local effect = data:toCardEffect()
+		if effect.card:isKindOf("SavageAssault") then
+			return self:objectName()
+		end
+	end,
+	on_cost = function(self, event, room, player, data)
+		if player:hasShownSkill("LuaHuoshou") or player:askForSkillInvoke("LuaHuoshou") then
+			room:broadcastSkillInvoke(self:objectName(), 1, player)
+			player:showGeneral(player:inHeadSkills(self:objectName()))
+			return true
+		end
+	end,
+	on_effect = function(self, event, room, player, data)
+		room:notifySkillInvoked(player, self:objectName())
+		local log = sgs.LogMessage()
+		log.type = "#SkillNullify"
+		log.from = player
+		log.arg = self:objectName()
+		log.arg2 = "savage_assault"
+		room:sendLog(log)
+		return true
+	end,
+}
+
+LuaHuoshou = sgs.CreateTriggerSkill{
+	name = "LuaHuoshou",
+	events = {sgs.TargetChosen,sgs.ConfirmDamage,sgs.CardFinished},
+	frequency = sgs.Skill_Compulsory,
+
+	can_trigger = function(self, event, room, player, data)
+		if not player then return false end
+		if event == sgs.TargetChosen then
+			local use = data:toCardUse()
+			if use.card:isKindOf("SavageAssault") then
+				local menghuo = room:findPlayerBySkillName(self:objectName())
+				if menghuo and menghuo:isAlive() and use.from:objectName() ~= menghuo:objectName() then
+					return self:objectName(),menghuo
+				end
+			end
+		elseif event == sgs.ConfirmDamage and room:getTag("HuoshouSource"):toPlayer() then
+			local damage = data:toDamage()
+			if not damage.card or not damage.card:isKindOf("SavageAssault") then return false end
+			
+			local menghuo = room:getTag("HuoshouSource"):toPlayer()
+			if menghuo:isAlive() then
+				damage.from = menghuo
+				data:setValue(damage)
+			end
+		elseif event == sgs.CardFinished then
+			local use = data:toCardUse()
+			if use.card:isKindOf("SavageAssault") then
+				room:removeTag("HuoshouSource")
+			end
+		end
+	end,
+
+	on_cost = function(self, event, room, player, data, ask_who)
+		if ask_who:hasShownSkill(self) or ask_who:askForSkillInvoke(self) then
+			room:broadcastSkillInvoke(self:objectName(), 2, ask_who)
+			return true
+		end
+	end,
+
+	on_effect = function(self, event, room, player, data, ask_who)
+        room:sendCompulsoryTriggerLog(ask_who, self:objectName(),true)
+		local d = sgs.QVariant()
+		d:setValue(ask_who)
+        room:setTag("HuoshouSource", d)
+	end,
+}
+
 --[[
 	祸水
 	相关武将：标-邹氏
