@@ -204,3 +204,78 @@ luaJushou = sgs.CreatePhaseChangeSkill{
 	引用：
 	状态：
 ]]
+
+LuaSavageAssaultAvoid2 = sgs.CreateTriggerSkill{
+	name = "#LuaSavageAssaultAvoid-for-zhurong",
+    events = {sgs.CardEffected},
+    frequency = sgs.Skill_Compulsory,
+
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill("LuaJuxiang") then return false end
+		local effect = data:toCardEffect()
+		if effect.card:isKindOf("SavageAssault") then
+			return self:objectName()
+		end
+	end,
+	on_cost = function(self, event, room, player, data)
+		if player:hasShownSkill("LuaJuxiang") or player:askForSkillInvoke("LuaJuxiang") then
+			player:showGeneral(player:inHeadSkills("LuaJuxiang"))
+			room:broadcastSkillInvoke("LuaJuxiang", 1, player)
+			return true
+		end
+	end,
+	on_effect = function(self, event, room, player, data)
+		room:notifySkillInvoked(player, "LuaJuxiang")
+		local log = sgs.LogMessage()
+		log.type = "#SkillNullify"
+		log.from = player
+		log.arg = "LuaJuxiang"
+		log.arg2 = "savage_assault"
+		room:sendLog(log)
+		return true
+	end,
+}
+
+LuaJuxiang = sgs.CreateTriggerSkill{
+	name = "LuaJuxiang",
+	events = {sgs.CardUsed,sgs.CardsMoveOneTime},
+	frequency = sgs.Skill_Compulsory,
+	
+	can_trigger = function(self, event, room, player, data)
+		if not player then return false end
+		if event == sgs.CardUsed then
+			local use = data:toCardUse()
+			if use.card:isKindOf("SavageAssault") then
+				if use.card:isVirtualCard() and use.card:subcardsLength() ~= 1 then return false end
+				if sgs.Sanguosha:getEngineCard(use.card:getEffectiveId())
+					and sgs.Sanguosha:getEngineCard(use.card:getEffectiveId()):isKindOf("SavageAssault") then
+                    room:setCardFlag(use.card:getEffectiveId(), "real_SA")
+				end
+			end
+		else
+			if player:isDead() or not player:hasSkill(self:objectName()) then return false end
+			local move = data:toMoveOneTime()
+			if move.card_ids:length() == 1 and move.from_places:contains(sgs.Player_PlaceTable) and move.to_place == sgs.Player_DiscardPile
+				and move.reason.m_reason == sgs.CardMoveReason_S_REASON_USE and room:getCardPlace(move.card_ids:at(0)) == sgs.Player_DiscardPile then
+				local card = sgs.Sanguosha:getCard(move.card_ids:first())
+				if card:hasFlag("real_SA") and player ~= move.from then
+					return self:objectName()
+				end
+			end
+		end
+	end,
+
+	on_cost = function(self, event, room, player, data)
+		if player:hasShownSkill(self) or player:askForSkillInvoke(self) then
+			room:broadcastSkillInvoke(self:objectName(), 2, player)
+			return true
+		end
+	end,
+
+	on_effect = function(self, event, room, player, data)
+        local move = data:toMoveOneTime()
+        room:sendCompulsoryTriggerLog(player, self:objectName(), true)
+        local sa = sgs.DummyCard(move.card_ids)
+        player:obtainCard(sa)
+	end,
+}
