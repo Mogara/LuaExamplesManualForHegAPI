@@ -258,7 +258,7 @@ LuaJuxiang = sgs.CreateTriggerSkill{
 			if move.card_ids:length() == 1 and move.from_places:contains(sgs.Player_PlaceTable) and move.to_place == sgs.Player_DiscardPile
 				and move.reason.m_reason == sgs.CardMoveReason_S_REASON_USE and room:getCardPlace(move.card_ids:at(0)) == sgs.Player_DiscardPile then
 				local card = sgs.Sanguosha:getCard(move.card_ids:first())
-				if card:hasFlag("real_SA") and player ~= move.from then
+				if card:hasFlag("real_SA") and player:objectName() ~= move.from:objectName() then
 					return self:objectName()
 				end
 			end
