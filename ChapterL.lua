@@ -120,6 +120,51 @@ LuaLiegongRange = sgs.CreateAttackRangeSkill{
 	引用：
 	状态：
 ]]
+
+LuaLieren = sgs.CreateTriggerSkill{
+	name = "LuaLieren",
+	events = {sgs.Damage},
+	
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local damage = data:toDamage()
+		if damage.card and damage.card:isKindOf("Slash") and not player:isKongcheng()
+			and not damage.to:isKongcheng() and damage.to ~= player and not damage.chain and not damage.transfer and not damage.to:hasFlag("Global_DFDebut") then
+            return self:objectName() .. "->" .. damage.to:objectName()
+		end
+	end,
+
+    on_cost = function(self, event, room, target, data, zhurong)
+		if zhurong:askForSkillInvoke(self, data) then
+			room:doAnimate(1, zhurong:objectName(), target:objectName())
+			room:broadcastSkillInvoke(self:objectName(), 1, zhurong)
+			local pd = zhurong:pindianSelect(target, self:objectName())
+			local _data = sgs.QVariant()
+			_data:setValue(pd)
+            zhurong:setTag("lieren_pd", _data)
+            return true
+		end
+	end,
+	on_effect = function(self, event, room, target, data, zhurong)
+		local pd = zhurong:getTag("lieren_pd"):toPindian()
+        zhurong:removeTag("lieren_pd")
+        if pd then
+			local success = zhurong:pindian(pd)
+			pd = nil
+			if not success then return false end
+
+			room:broadcastSkillInvoke(self:objectName(), 2, zhurong)
+			if not target:isNude() then
+				local card_id = room:askForCardChosen(zhurong, target, "he", self:objectName())
+				reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_EXTRACTION, zhurong:objectName())
+                room:obtainCard(zhurong, sgs.Sanguosha:getCard(card_id), reason, room:getCardPlace(card_id) ~= sgs.Player_PlaceHand)
+			end
+		else
+			assert(false)
+		end
+	end,
+}
+
 --[[
 	流离
 	相关武将：标-大乔
