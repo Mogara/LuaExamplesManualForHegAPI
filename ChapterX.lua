@@ -10,6 +10,39 @@
 	引用：
 	状态：
 ]]
+
+LuaXiangle = sgs.CreateTriggerSkill{
+	name = "LuaXiangle",
+	events = {sgs.TargetConfirming},
+	frequency = sgs.Skill_Compulsory,
+
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local use = data:toCardUse()
+		if use.card:isKindOf("Slash") and use.to:contains(player) then
+			return self:objectName()
+		end
+	end,
+
+	on_cost = function(self, event, room, player, data)
+		if player:hasShownSkill(self:objectName()) or player:askForSkillInvoke(self:objectName(), data) then
+			room:sendCompulsoryTriggerLog(player, self:objectName(), true)
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
+	end,
+
+	on_effect = function(self, event, room, player, data)
+        local use = data:toCardUse()
+		local d = sgs.QVariant()
+		d:setValue(player)
+		if not room:askForCard(use.from, ".Basic", "@xiangle-discard:" .. player:objectName(), d) then
+			use.nullified_list:append(player:objectName())
+			data:setValue(use)
+		end
+	end,
+}
+
 --[[
 	骁果
 	相关武将：标-乐进
