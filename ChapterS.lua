@@ -164,6 +164,45 @@ luaShensuSlash = sgs.CreateTargetModSkill{
 	引用：
 	状态：
 ]]
+
+LuaShenzhi = sgs.CreatePhaseChangeSkill{
+	name = "LuaShenzhi",
+	frequency = sgs.Skill_Frequent,
+	can_preshow = false,
+		--This skill can't be frequent in game actually.
+		--because the frequency = Frequent has no effect in UI currently, we use this to reduce the AI delay
+
+
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		if player:getPhase() ~= sgs.Player_Start or player:isKongcheng() then return false end
+		return self:objectName()
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName()) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
+	end,
+
+	on_phasechange = function(self, ganfuren)
+		local handcard_num = 0
+		for _, card in sgs.qlist(ganfuren:getHandcards()) do
+			if not ganfuren:isJilei(card) then
+				handcard_num = handcard_num + 1
+			end
+		end
+		ganfuren:throwAllHandCards()
+		if handcard_num >= ganfuren:getHp() then
+			local recover = sgs.RecoverStruct()
+			recover.who = ganfuren
+			ganfuren:getRoom():recover(ganfuren, recover)
+		end
+        return false
+	end,
+}
+
 --[[
 	生息
 	相关武将：阵-蒋琬&费祎
@@ -204,6 +243,62 @@ luaShensuSlash = sgs.CreateTargetModSkill{
 	引用：
 	状态：
 ]]
+
+LuaShushen = sgs.CreateTriggerSkill{
+	name = "LuaShushen",
+	events = {sgs.HpRecover},
+	can_preshow = true,
+
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local friends = sgs.SPlayerList()
+		for _, p in sgs.qlist(room:getOtherPlayers(player)) do
+			if player:willBeFriendWith(p) then
+				friends:append(p)
+			end
+		end
+		if friends:isEmpty() then return false end
+		local trigger_list = {}
+		local recover = data:toRecover()
+		for i = 1, recover.recover, 1 do
+			table.insert(trigger_list, self:objectName())
+		end
+		return table.concat(trigger_list,",")
+	end,
+
+	on_cost = function(self, event, room, player, data)
+		local friends = sgs.SPlayerList()
+		for _, p in sgs.qlist(room:getOtherPlayers(player)) do
+			if player:willBeFriendWith(p) then
+				friends:append(p)
+			end
+		end
+		if friends:isEmpty() then return false end
+		local target = room:askForPlayerChosen(player, friends, self:objectName(), "shushen-invoke", true, true)
+		if target then
+			room:broadcastSkillInvoke(self:objectName(), player)
+
+			local target_list = player:getTag("LuaShushen_target"):toList()
+			local d = sgs.QVariant()
+			d:setValue(target)
+			target_list:append(d)
+			player:setTag("LuaShushen_target",sgs.QVariant(target_list))
+            return true
+		end
+	end,
+
+	on_effect = function(self, event, room, player, data)
+        local target_list = player:getTag("LuaShushen_target"):toList()
+		to = target_list:last():toPlayer()
+		local d = sgs.QVariant()
+		d:setValue(to)
+		target_list:removeOne(d)
+		player:setTag("LuaShushen_target",sgs.QVariant(target_list))
+
+        if to then to:drawCards(1) end
+	end,
+}
+
 --[[
 	双刃
 	相关武将：标-纪灵
