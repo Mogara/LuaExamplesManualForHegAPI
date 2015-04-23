@@ -60,6 +60,75 @@ LuaFankui = sgs.CreateTriggerSkill{
 	状态：
 ]]
 
+LuaFangquanCard = sgs.CreateSkillCard{
+	name = "LuaFangquanCard",
+
+	filter = function(self, selected, to_select, Self)
+		return #selected == 0 and to_select:objectName() ~= Self:objectName()
+	end,
+	on_effect = function(self, effect)
+		local room = effect.from:getRoom()
+		local player = effect.to
+		
+		local log = sgs.LogMessage()
+		log.type = "#Fangquan"
+		log.to:append(player)
+		room:sendLog(log)
+
+		player:gainAnExtraTurn()
+	end,
+}
+
+LuaFangquanVS = sgs.CreateOneCardViewAsSkill{
+	name = "LuaFangquan",
+	filter_pattern = ".|.|.|hand!",
+	response_pattern = "@@LuaFangquan",
+
+	view_as = function(self, card)
+		local fangquan = LuaFangquanCard:clone()
+        fangquan:addSubcard(card)
+        fangquan:setShowSkill(self:objectName())
+        return fangquan
+	end,
+}
+
+LuaFangquan = sgs.CreateTriggerSkill{
+	name = "LuaFangquan",
+	events = {sgs.EventPhaseChanging},
+	view_as_skill = LuaFangquanVS,
+	can_preshow = true,
+
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local change = data:toPhaseChange()
+		if change.to == sgs.Player_Play and not player:isSkipped(sgs.Player_Play) then
+			return self:objectName()
+		elseif change.to == sgs.Player_NotActive and player:hasFlag(self:objectName()) and player:canDiscard(player, "h") then
+            return self:objectName()
+		end
+	end,
+
+	on_cost = function(self, event, room, player, data)
+        local change = data:toPhaseChange()
+		if change.to == sgs.Player_Play then
+			if player:askForSkillInvoke(self:objectName()) then
+				player:skip(sgs.Player_Play)
+				room:broadcastSkillInvoke(self:objectName(), 1, player)
+                return true
+			end
+		else
+            room:askForUseCard(player, "@@LuaFangquan", "@fangquan-discard", -1, sgs.Card_MethodDiscard)
+		end
+	end,
+
+	on_effect = function(self, event, room, player, data)
+        local change = data:toPhaseChange()
+        if change.to == sgs.Player_Play then
+            player:setFlags(self:objectName())
+		end
+	end,
+}
+
 --[[
 	放逐
 	相关武将：标-曹丕
