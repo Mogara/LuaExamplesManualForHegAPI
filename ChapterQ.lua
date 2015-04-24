@@ -38,6 +38,23 @@ LuaQicai = sgs.CreateTargetModSkill{
 	引用：
 	状态：
 ]]
+
+LuaQixi = sgs.CreateOneCardViewAsSkill{
+	name = "LuaQixi",
+	response_or_use = true,
+
+	view_filter = function(self, to_select)
+		return to_select:isBlack()
+	end,
+	view_as = function(self,card)
+		local dismantlement = sgs.Sanguosha:cloneCard("dismantlement", card:getSuit(), card:getNumber())
+		dismantlement:addSubcard(card:getId())
+		dismantlement:setSkillName(self:objectName())
+		dismantlement:setShowSkill(self:objectName())
+        return dismantlement
+	end,
+}
+
 --[[
 	千幻
 	相关武将：阵-于吉
