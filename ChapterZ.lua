@@ -91,6 +91,40 @@ LuaZaiqi = sgs.CreatePhaseChangeSkill{
 	引用：
 	状态：
 ]]
+
+LuaZhihengCard = sgs.CreateSkillCard{
+	name = "LuaZhihengCard",
+	target_fixed = true,
+	on_use = function(self, room, source)
+		if source:isAlive() then
+			source:drawCards(self:getSubcards():length())
+		end
+	end,
+}
+
+LuaZhiheng = sgs.CreateViewAsSkill{
+	name ="LuaZhiheng",
+	
+	view_filter = function(self, selected, to_select)
+		return not sgs.Self:isJilei(to_select) and #selected < sgs.Self:getMaxHp()
+	end,
+
+	view_as = function(self, cards)
+		if #cards == 0 then return nil end
+		local zhiheng_card = LuaZhihengCard:clone()
+		for _, c in ipairs(cards) do
+			zhiheng_card:addSubcard(c)
+		end
+		zhiheng_card:setSkillName(self:objectName())
+		zhiheng_card:setShowSkill(self:objectName())
+		return zhiheng_card
+	end,
+	
+	enabled_at_play = function(self, player)
+		return player:canDiscard(player, "he") and not player:hasUsed("#LuaZhihengCard")
+	end,
+}
+
 --[[
 	直谏
 	相关武将：标-张昭&张纮
