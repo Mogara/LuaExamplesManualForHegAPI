@@ -38,6 +38,53 @@ LuaKanpo = sgs.CreateOneCardViewAsSkill{
 	引用：
 	状态：
 ]]
+
+
+LuaKejiRecord = sgs.CreateTriggerSkill{
+	name = "#LuaKejiRecord",
+	events = {sgs.PreCardUsed,sgs.CardResponded},
+	frequency = sgs.Compulsory;
+	
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local card
+		if event == sgs.PreCardUsed then
+			card = data:toCardUse().card
+		else
+			card = data:toCardResponse().m_card
+		end
+		if card:isKindOf("Slash") and player:getPhase() == sgs.Player_Play then
+			player:setFlags("KejiSlashInPlayPhase")
+		end
+	end,
+}
+
+LuaKeji = sgs.CreateTriggerSkill{
+	name = "LuaKeji",
+	events = {sgs.EventPhaseChanging},
+	frequency = sgs.Skill_Frequent,
+
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local change = data:toPhaseChange()
+		if not player:hasFlag("KejiSlashInPlayPhase") and change.to == sgs.Player_Discard then
+			return self:objectName()
+		end
+	end,
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName()) then
+			if player:getHandcardNum() > player:getMaxCards() then
+				room:broadcastSkillInvoke(self:objectName(), player)
+			end
+            return true
+		end
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		player:skip(sgs.Player_Discard)
+	end,
+}
+
 --[[
 	空城
 	相关武将：标-诸葛亮
