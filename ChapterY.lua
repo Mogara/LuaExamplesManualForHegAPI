@@ -138,6 +138,24 @@ LuaYizhi = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaYingzi = sgs.CreateDrawCardsSkill{
+	name = "LuaYingzi",
+	frequency = sgs.Skill_Frequent,
+	can_preshow = true,
+
+	on_cost = function(self,event,room,player,data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		if player:askForSkillInvoke(self:objectName()) then
+			room:broadcastSkillInvoke(self:objectName())
+			return true
+		end
+	end,
+	draw_num_func = function(self,player,n)
+		return n + 1
+	end,
+}
+
 --[[
 	勇决
 	相关武将：势-糜夫人
