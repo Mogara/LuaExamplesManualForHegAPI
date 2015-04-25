@@ -128,6 +128,35 @@ LuaKongcheng = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaKurouCard = sgs.CreateSkillCard{
+	name = "LuaKurouCard",
+    target_fixed = true,
+
+	extra_cost = function(self,room,card_use)
+		room:loseHp(card_use.from)
+	end,
+	on_use = function(self,room,source)
+		room:drawCards(source, 2)
+	end,
+}
+
+LuaKurou = sgs.CreateViewAsSkill{
+	name = "LuaKurou",
+	view_filter = function(self)
+		return false
+	end,
+	enabled_at_play = function(self,player)
+		return player:getHp() > 0
+	end,
+	view_as = function(self)
+		local card = LuaKurouCard:clone()
+		card:setShowSkill(self:objectName())
+		card:setSkillName(self:objectName())
+		return card
+	end,
+}
+
 --[[
 	狂斧
 	相关武将：标-潘凤
