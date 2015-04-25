@@ -77,20 +77,32 @@ LuaQixi = sgs.CreateOneCardViewAsSkill{
 	状态：
 ]]
 
-LuaDuoshi = sgs.CreateOneCardViewAsSkill{
-	name = "LuaDuoshi",
-	filter_pattern = ".|red|.|hand",
-	response_or_use = true,
+LuaQianxun = sgs.CreateTriggerSkill{
+	name = "LuaQianxun",
+	events = {sgs.TargetConfirming},
+	frequency = sgs.Skill_Compulsory,
 
-	enabled_at_play = function(self,player)
-		return player:usedTimes("ViewAsSkill_LuaDuoshiCard") < 4
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local use = data:toCardUse()
+		if not use.card or use.card:getTypeId() ~= sgs.Card_TypeTrick or (not use.card:isKindOf("Snatch") and not use.card:isKindOf("Indulgence")) or not use.to:contains(player) then
+			return false end
+        return self:objectName()
 	end,
-	view_as = function(self,card)
-		local await = sgs.Sanguosha:cloneCard("await_exhausted", card:getSuit(), card:getNumber())
-		await:addSubcard(card:getId())
-		await:setSkillName(self:objectName())
-		await:setShowSkill(self:objectName())
-        return await
+
+	on_cost = function(self, event, room, player, data)
+		if player:hasShownSkill(self:objectName()) or player:askForSkillInvoke(self:objectName()) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
+	end,
+
+	on_effect = function(self, event, room, player, data)
+        room:sendCompulsoryTriggerLog(player, self:objectName(), true)
+		local use = data:toCardUse()
+		sgs.Room_cancelTarget(use, player)
+		data:setValue(use)
+        return false
 	end,
 }
 
