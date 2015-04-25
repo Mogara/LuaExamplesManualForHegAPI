@@ -76,6 +76,24 @@ LuaQixi = sgs.CreateOneCardViewAsSkill{
 	引用：
 	状态：
 ]]
+
+LuaDuoshi = sgs.CreateOneCardViewAsSkill{
+	name = "LuaDuoshi",
+	filter_pattern = ".|red|.|hand",
+	response_or_use = true,
+
+	enabled_at_play = function(self,player)
+		return player:usedTimes("ViewAsSkill_LuaDuoshiCard") < 4
+	end,
+	view_as = function(self,card)
+		local await = sgs.Sanguosha:cloneCard("await_exhausted", card:getSuit(), card:getNumber())
+		await:addSubcard(card:getId())
+		await:setSkillName(self:objectName())
+		await:setShowSkill(self:objectName())
+        return await
+	end,
+}
+
 --[[
 	强袭
 	相关武将：标-典韦
