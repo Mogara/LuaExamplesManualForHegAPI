@@ -12,6 +12,47 @@
 	状态：
 ]]
 
+LuaFanjianCard = sgs.CreateSkillCard{
+	name = "LuaFanjianCard",
+	filter = function(self,selected,to_select,player)
+		return #selected == 0 and to_select:objectName() ~= player:objectName()
+	end,
+	on_effect = function(self,effect)
+		local zhouyu = effect.from
+		local target = effect.to
+		local room = zhouyu:getRoom()
+		local card_id = zhouyu:getRandomHandCardId()
+		local card = sgs.Sanguosha:getCard(card_id)
+		local suit = room:askForSuit(target, "LuaFanjian")
+		local log = sgs.LogMessage()
+		log.type = "#ChooseSuit"
+		log.from = target
+		log.arg = sgs.Card_Suit2String(suit)
+		room:sendLog(log)
+
+		room:getThread():delay()
+		target:obtainCard(card)
+		room:showCard(target, card_id)
+
+		if card:getSuit() ~= suit then
+			room:damage(sgs.DamageStruct("LuaFanjian", zhouyu, target))
+		end
+	end,
+}
+
+LuaFanjian = sgs.CreateZeroCardViewAsSkill{
+	name = "LuaFanjian",
+
+	enabled_at_play = function(self,player)
+		return not player:isKongcheng() and not player:hasUsed("#LuaFanjianCard")
+	end,
+	view_as = function(self)
+		local fj = LuaFanjianCard:clone()
+		fj:setShowSkill(self:objectName())
+        return fj
+	end,
+}
+
 --[[
 	反馈
 	相关武将：标-司马懿
