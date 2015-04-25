@@ -232,3 +232,16 @@ LuaGuicai = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaGuose = sgs.CreateOneCardViewAsSkill{
+	name = "LuaGuose",
+	filter_pattern = ".|diamond",
+	response_or_use = true,
+	view_as = function(self,card)
+		local indulgence = sgs.Sanguosha:cloneCard("indulgence",card:getSuit(), card:getNumber())
+		indulgence:addSubcard(card:getId())
+		indulgence:setSkillName(self:objectName())
+		indulgence:setShowSkill(self:objectName())
+        return indulgence
+	end,
+}
