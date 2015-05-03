@@ -91,6 +91,32 @@ luaXiaoguo = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+
+--枭姬
+LuaXiaoji = sgs.CreateTriggerSkill{
+	name = "LuaXiaoji",
+	events = {sgs.CardsMoveOneTime},
+	frequency = sgs.Skill_Frequent,
+	can_trigger = function(self,event,room,sunshangxiang,data)
+		if not sunshangxiang or sunshangxiang:isDead() or not sunshangxiang:hasSkill(self:objectName()) then return false end
+		local move = data:toMoveOneTime()
+		if move.from and move.from:objectName() == sunshangxiang:objectName() and move.from_places:contains(sgs.Player_PlaceEquip) then
+			return self:objectName()
+		end
+	end,
+	
+	on_cost = function(self,event,room,sunshangxiang,data)
+		if sunshangxiang:askForSkillInvoke(self:objectName()) then
+			room:broadcastSkillInvoke(self:objectName(), sunshangxiang)
+			return true
+		end
+	end,
+	on_effect = function(self,event,room,sunshangxiang,data)
+        sunshangxiang:drawCards(2)
+	end,
+}
+
 --[[
 	行殇
 	相关武将：标-曹丕
