@@ -168,6 +168,50 @@ luaJieming = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+--结姻
+
+LuaJieyinCard = sgs.CreateSkillCard{
+	name = "LuaJieyinCard",
+	filter = function(self,targets,to_select,player)
+		return #targets == 0 and to_select:isMale() and to_select:isWounded() and to_select:objectName() ~= player:objectName()
+	end,
+	on_effect = function(self,effect)
+		local room = effect.from:getRoom()
+		local recover = sgs.RecoverStruct()
+		recover.card = self
+		recover.who = effect.from
+		local targets = sgs.SPlayerList()
+		targets:append(effect.from)
+		targets:append(effect.to)
+		room:sortByActionOrder(targets)
+		for _, target in sgs.qlist(targets) do
+			room:recover(target, recover, true)
+		end
+	end,
+}
+LuaJieyin = sgs.CreateViewAsSkill{
+	name = "LuaJieyin",
+	enabled_at_play = function(self,player)
+		return player:getHandcardNum() >= 2 and not player:hasUsed("#LuaJieyinCard")
+	end,
+	view_filter = function(self,selected,to_select)
+		if #selected > 1 or sgs.Self:isJilei(to_select) then
+			return false
+		end
+        return not to_select:isEquipped()
+	end,
+	view_as = function(self,cards)
+        if #cards ~= 2 then return nil end
+		local jieyin_card = LuaJieyinCard:clone()
+		jieyin_card:addSubcard(cards[1])
+		jieyin_card:addSubcard(cards[2])
+		jieyin_card:setSkillName(self:objectName())
+        jieyin_card:setShowSkill(self:objectName())
+        return jieyin_card
+	end,
+}
+
 --[[
 	据守
 	相关武将：标-曹仁
