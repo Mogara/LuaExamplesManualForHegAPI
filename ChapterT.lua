@@ -47,6 +47,102 @@ luaTiandu = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+
+--天香
+LuaTianxiangCard = sgs.CreateSkillCard{
+	name = "LuaTianxiangCard",
+	on_effect = function(self,effect)
+		effect.to:setFlags("tianxiang_target")
+		effect.from:setFlags("tianxiang_invoke")
+	end,
+}
+
+LuaTianxiangVS = sgs.CreateOneCardViewAsSkill{
+	name = "LuaTianxiang",
+	response_pattern = "@@LuaTianxiang",
+
+	view_as = function(self, card)
+		local tianxiangCard = LuaTianxiangCard:clone()
+		tianxiangCard:addSubcard(card)		
+		tianxiangCard:setSkillName(self:objectName())
+		tianxiangCard:setShowSkill(self:objectName())
+        return tianxiangCard
+	end,
+	
+	view_filter = function(self, to_select)
+		if sgs.Self:isJilei(to_select) then return false end
+		local pat
+		if sgs.Self:hasSkill("hongyan") and not sgs.Self:hasShownSkill("hongyan") then
+			pat = ".|heart,spade|.|hand"
+        else
+			pat = ".|heart|.|hand"
+		end
+		return sgs.Sanguosha:matchExpPattern(pat, sgs.Self, to_select)
+    end,
+}
+
+LuaTianxiang = sgs.CreateTriggerSkill{
+	name = "LuaTianxiang",
+	events = {sgs.DamageInflicted},
+	view_as_skill = LuaTianxiangVS,
+	can_preshow = true,
+
+	can_trigger = function(self,event,room,xiaoqiao,data)
+		if not xiaoqiao or xiaoqiao:isDead() or not xiaoqiao:hasSkill(self:objectName()) then return false end
+		if xiaoqiao:canDiscard(xiaoqiao, "h") then
+			return self:objectName()
+		end
+	end,
+	on_cost = function(self,event,room,xiaoqiao,data)
+		for _, p in sgs.qlist(room:getAlivePlayers()) do
+            p:setFlags("-tianxiang_target")
+		end
+		xiaoqiao:setFlags("-tianxiang_invoke");
+		xiaoqiao:setTag("TianxiangDamage",data)
+        room:askForUseCard(xiaoqiao, "@@LuaTianxiang", "@tianxiang-card", -1, sgs.Card_MethodDiscard)
+		xiaoqiao:removeTag("TianxiangDamage")
+		if xiaoqiao:hasFlag("tianxiang_invoke") then
+			return true
+		end
+	end,
+	
+	on_effect = function(self,event,room,xiaoqiao,data)
+		local target
+		for _, p in sgs.qlist(room:getAlivePlayers()) do
+			if p:hasFlag("tianxiang_target") then
+				target = p
+				break
+			end
+		end
+		xiaoqiao:setFlags("-tianxiang_invoke")
+		target:setFlags("-tianxiang_target")
+
+		local damage = data:toDamage()
+		damage.transfer = true
+		damage.to = target
+		damage.transfer_reason = "LuaTianxiang"
+
+		local d = sgs.QVariant()
+		d:setValue(damage)
+        xiaoqiao:setTag("TransferDamage", d)
+        return true
+	end,
+}
+
+LuaTianxiangDraw = sgs.CreateTriggerSkill{
+	name = "#LuaTianxiang",
+	events = {sgs.DamageComplete},
+	frequency = sgs.Skill_Compulsory,
+	can_trigger = function(self,event,room,player,data)
+        if not player then return false end
+		local damage = data:toDamage()
+		if player:isAlive() and damage.transfer and damage.transfer_reason == "LuaTianxiang" then
+			player:drawCards(player:getLostHp())
+		end
+	end,
+}
+
 --[[
 	天义
 	相关武将：标-太史慈
