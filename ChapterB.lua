@@ -66,3 +66,176 @@ LuaBazhen = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+--不屈
+function LuaRemove(zhoutai)
+		local room = zhoutai:getRoom()
+		local buqu = zhoutai:getPile("luabuqu")
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_REMOVE_FROM_PILE, "" , "LuaBuqu", "")
+		local need = 1 - zhoutai:getHp()
+		if need <= 0 then
+            for _, card_id in sgs.qlist(buqu) do
+				local log = sgs.LogMessage()
+				log.type = "$BuquRemove"
+                log.from = zhoutai
+				log.card_str = sgs.Sanguosha:getCard(card_id):toString()
+				room:sendLog(log)
+                room:throwCard(sgs.Sanguosha:getCard(card_id), reason, nil)
+			end
+		else
+			local to_remove = buqu:length() - need
+			for i = 1, to_remove, 1 do
+				room:fillAG(buqu, zhoutai)
+				--int aidelay = Config.AIDelay;
+				--Config.AIDelay = 0;
+				local card_id = room:askForAG(zhoutai, buqu, false, "LuaBuqu")
+				--Config.AIDelay = aidelay;
+				local log = sgs.LogMessage()
+				log.type = "$BuquRemove"
+				log.from = zhoutai
+				log.card_str = sgs.Sanguosha:getCard(card_id):toString()
+				room:sendLog(log)
+
+				buqu:removeOne(card_id)
+				room:throwCard(sgs.Sanguosha:getCard(card_id), reason, nil)
+				room:clearAG(zhoutai)
+			end
+		end
+	end
+	
+
+LuaBuquRemove = sgs.CreateTriggerSkill{
+	name = "#LuaBuqu-remove",
+	events = {sgs.HpRecover},
+	frequency = sgs.Skill_Compulsory,
+
+	can_trigger = function(self,event,room,zhoutai,data)
+		if not zhoutai or not zhoutai:isAlive() or not zhoutai:hasSkill("LuaBuqu") then return false end
+		if zhoutai:getPile("luabuqu"):length() > 0 then
+            LuaRemove(zhoutai)
+		end
+	end,
+}
+
+LuaBuqu = sgs.CreateTriggerSkill{
+	name = "LuaBuqu",
+	events = {sgs.PostHpReduced,sgs.AskForPeachesDone},
+	frequency = sgs.Skill_Frequent,
+
+	can_trigger = function(self,event,room,zhoutai,data)
+		if not zhoutai or not zhoutai:isAlive() or not zhoutai:hasSkill(self:objectName()) then return false end
+		if event == sgs.PostHpReduced and zhoutai:getHp() < 1 then
+			return self:objectName()
+		elseif event == sgs.AskForPeachesDone then
+			local buqu = zhoutai:getPile("luabuqu")
+			if zhoutai:getHp() > 0 then return false end
+			if room:getTag("LuaBuqu"):toString() ~= zhoutai:objectName() then return false end
+			room:removeTag("LuaBuqu")
+
+			local duplicate_numbers = {}
+			local numbers = {}
+			for _, card_id in sgs.qlist(buqu) do
+				local card = sgs.Sanguosha:getCard(card_id)
+				local number = card:getNumber()
+
+				if table.contains(numbers, number) and not table.contains(duplicate_numbers, number) then
+                    table.insert(duplicate_numbers,number)
+                else
+                    table.insert(numbers,number)
+				end
+			end
+
+			if #duplicate_numbers == 0 then
+				room:broadcastSkillInvoke(self:objectName(), zhoutai)
+				room:setPlayerFlag(zhoutai, "-Global_Dying")
+				return self:objectName()
+			else
+				local log = sgs.LogMessage()
+				log.type = "#BuquDuplicate"
+				log.from = zhoutai
+				log.arg = #duplicate_numbers
+                room:sendLog(log)
+
+				for i = 1, #duplicate_numbers, 1 do
+					local number = duplicate_numbers[i]
+
+					local log = sgs.LogMessage()
+                    log.type = "#BuquDuplicateGroup"
+                    log.from = zhoutai
+                    log.arg = i
+					local number_string = {"-","A","2","3","4","5","6","7","8","9","10","J","Q","K"}
+					log.arg2 = number_string[number]
+					room:sendLog(log)
+					for _, card_id in sgs.qlist(buqu) do
+						local card = sgs.Sanguosha:getCard(card_id)
+						if card:getNumber() == number then
+							local log = sgs.LogMessage()
+							log.type = "$BuquDuplicateItem"
+							log.from = zhoutai
+							log.card_str = card_id
+							room:sendLog(log)
+						end
+					end
+				end
+			end
+		end
+	end,
+
+	on_cost = function(self,event,room,zhoutai,data)
+		if event == sgs.AskForPeachesDone then
+			return true
+		end
+		if zhoutai:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), zhoutai)
+			local buqu = zhoutai:getPile("luabuqu")
+			local need = 1 - zhoutai:getHp()
+			local n = need - buqu:length()
+			if n > 0 then
+				local card_ids = room:getNCards(n, false)
+                zhoutai:addToPile("luabuqu", card_ids)
+			end
+			return true
+		end
+	end,
+
+	on_effect = function(self,event,room,zhoutai,data)
+		if event == sgs.AskForPeachesDone then
+			return true
+		end
+		if zhoutai:getHp() < 1 then
+			room:setTag("LuaBuqu", sgs.QVariant(zhoutai:objectName()))
+			local buqunew = zhoutai:getPile("luabuqu")
+			
+			local duplicate_numbers = {}
+			local numbers = {}
+			for _, card_id in sgs.qlist(buqunew) do
+				local card = sgs.Sanguosha:getCard(card_id)
+				local number = card:getNumber()
+
+				if table.contains(numbers, number) and not table.contains(duplicate_numbers, number) then
+                    table.insert(duplicate_numbers,number)
+                else
+                    table.insert(numbers,number)
+				end
+			end
+			if #duplicate_numbers == 0 then
+				room:removeTag("LuaBuqu")
+                return true
+			end
+		end
+	end,
+}
+
+LuaBuquClear = sgs.CreateTriggerSkill{
+	name = "#LuaBuquClear",
+	frequency = sgs.Skill_Compulsory,
+	events = {sgs.EventLoseSkill},
+
+	can_trigger = function(self,event,room,zhoutai,data)
+		if data:toString() == "LuaBuqu" then
+			if zhoutai:getHp() <= 0 then
+				room:enterDying(zhoutai, nil)
+			end
+		end
+	end,
+}
