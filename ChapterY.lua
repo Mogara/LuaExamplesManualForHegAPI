@@ -124,6 +124,57 @@ LuaYizhi = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaYinghun = sgs.CreatePhaseChangeSkill{
+	name = "LuaYinghun",
+	can_preshow = false,
+	can_trigger = function(self,event,room,target,data)
+		if not target or target:isDead() or not target:hasSkill(self:objectName()) then return false end
+		if target:getPhase() == sgs.Player_Start and target:isWounded() then
+			return self:objectName()
+		end
+	end,
+	on_cost = function(self,event,room,player,data)
+		local to = room:askForPlayerChosen(player, room:getOtherPlayers(player), self:objectName(), "yinghun-invoke", true, true)
+		if to then
+			local d = sgs.QVariant()
+			d:setValue(to)
+			player:setTag("yinghun_target",d)
+			return true
+		end
+	end,
+	on_phasechange = function(self,sunjian)
+		local room = sunjian:getRoom()
+		local to = sunjian:getTag("yinghun_target"):toPlayer()
+		if to then
+			local x = sunjian:getLostHp()
+
+			if x == 1 then
+				room:broadcastSkillInvoke(self:objectName(), 1, sunjian)
+
+				to:drawCards(1)
+				room:askForDiscard(to, self:objectName(), 1, 1, false, true)
+			else
+				to:setFlags("YinghunTarget")
+				local choice = room:askForChoice(sunjian, self:objectName(), "d1tx+dxt1")
+				to:setFlags("-YinghunTarget")
+				if choice == "d1tx" then
+					room:broadcastSkillInvoke(self:objectName(), 2, sunjian)
+
+					to:drawCards(1)
+					room:askForDiscard(to, self:objectName(), x, x, false, true)
+				else
+					room:broadcastSkillInvoke(self:objectName(), 1, sunjian)
+
+					to:drawCards(x)
+					room:askForDiscard(to, self:objectName(), 1, 1, false, true)
+				end
+			end
+		end
+		return false
+	end,
+}
+
 --[[
 	鹰扬
 	相关武将：势-孙策
