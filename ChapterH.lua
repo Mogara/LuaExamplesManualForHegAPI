@@ -47,6 +47,53 @@
 	引用：
 	状态：
 ]]
+
+LuaHongyanVS = sgs.CreateFilterSkill{
+	name = "LuaHongyan",
+	view_filter = function(self, to_select)
+		local room = sgs.Sanguosha:currentRoom()
+		for _, p in sgs.qlist(room:getPlayers()) do
+			if p:ownSkill(self:objectName()) and p:hasShownSkill(self:objectName()) then
+				return to_select:getSuit() == sgs.Card_Spade
+			end
+		end
+		return false
+	end,
+	view_as = function(self, card)
+		local new_card = sgs.Sanguosha:getWrappedCard(card:getEffectiveId())
+		new_card:setSkillName(self:objectName())
+		new_card:setSuit(sgs.Card_Heart)
+		new_card:setModified(true)
+        return new_card
+	end,
+}
+
+LuaHongyan = sgs.CreateTriggerSkill{
+	name = "LuaHongyan",
+	events = {sgs.FinishRetrial},
+	frequency = sgs.Skill_Compulsory,
+	view_as_skill = LuaHongyanVS,
+	can_trigger = function(self,event,room,xiaoqiao,data)
+		if not xiaoqiao or xiaoqiao:isDead() or not xiaoqiao:hasSkill(self:objectName()) then return false end
+		local judge = data:toJudge()
+		if judge.who:objectName() == xiaoqiao:objectName() and judge.card:getSuit() == sgs.Card_Spade then
+			return self:objectName()
+		end
+	end,
+	
+	on_cost = function(self,event,room,xiaoqiao,data)
+        return xiaoqiao:hasShownSkill(self:objectName()) or xiaoqiao:askForSkillInvoke(self:objectName(), data)
+	end,
+	on_effect = function(self,event,room,xiaoqiao,data)
+		local judge = data:toJudge()
+		local cards = sgs.CardList()
+		cards:append(judge.card)
+        room:filterCards(xiaoqiao, cards, true)
+        judge:updateResult()
+        return false
+	end,
+}
+
 --[[
 	护援
 	相关武将：阵-曹洪
