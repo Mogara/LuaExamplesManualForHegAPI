@@ -12,6 +12,70 @@
 	状态：
 ]]
 
+local json = require ("json")
+LuaDimengCard = sgs.CreateSkillCard{
+	name = "LuaDimengCard",
+	filter = function(self,targets,to_select,Self)
+		if to_select:objectName() == Self:objectName() then return false end
+		if #targets == 0 then return true end
+		if #targets  == 1 then
+			return math.abs(to_select:getHandcardNum() - targets[1]:getHandcardNum()) == self:subcardsLength()
+		end
+		return false
+	end,
+	feasible =  function(self,targets)
+		return #targets == 2
+	end,
+	on_use = function(self, room, source, targets)
+		local a = targets[1]
+		local b = targets[2]
+		a:setFlags("DimengTarget")
+		b:setFlags("DimengTarget")
+		local n1 = a:getHandcardNum()
+		local n2 = b:getHandcardNum()
+		for _, p in sgs.qlist(room:getAlivePlayers()) do
+			if p:objectName() ~= a:objectName() and p:objectName() ~= b:objectName() then
+				room:doNotify(p, sgs.CommandType.S_COMMAND_EXCHANGE_KNOWN_CARDS, json.encode({a:objectName(), b:objectName()}))
+			end
+		end
+		local exchangeMove = sgs.CardsMoveList()
+		local move1 = sgs.CardsMoveStruct(a:handCards(), b, sgs.Player_PlaceHand, sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_SWAP, a:objectName(), b:objectName(), "LuaDimeng", ""))
+		local move2 = sgs.CardsMoveStruct(b:handCards(), a, sgs.Player_PlaceHand, sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_SWAP, b:objectName(), a:objectName(), "LuaDimeng", ""))
+		exchangeMove:append(move1)
+		exchangeMove:append(move2)
+		room:moveCardsAtomic(exchangeMove, false)
+		
+		local log = sgs.LogMessage()
+        log.type = "#Dimeng"
+		log.from = a
+		log.to:append(b)
+		log.arg = n1
+		log.arg2 = n2
+		room:sendLog(log)
+		room:getThread():delay()		
+		a:setFlags("-DimengTarget")
+		b:setFlags("-DimengTarget")
+	end,
+}
+
+LuaDimeng = sgs.CreateViewAsSkill{
+	name = "LuaDimeng",
+	view_filter = function(self, selected, to_select)
+		return not sgs.Self:isJilei(to_select)
+	end ,
+	view_as = function(self, cards)
+		local card = LuaDimengCard:clone()
+        card:setShowSkill(self:objectName())
+		for _, c in ipairs(cards) do
+			card:addSubcard(c)
+		end
+		return card
+	end ,
+	enabled_at_play = function(self, player)
+		return not player:hasUsed("#LuaDimengCard")
+	end
+}
+
 --[[
 	短兵
 	相关武将：标-丁奉
