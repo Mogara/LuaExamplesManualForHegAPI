@@ -55,6 +55,203 @@ Luaganglie = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaGuzhengRecord = sgs.CreateTriggerSkill{
+	name = "#Luaguzheng-record",
+	events = {sgs.CardsMoveOneTime},
+	frequency = sgs.Skill_Compulsory,
+	can_trigger = function(self,event,room,erzhang,data)
+		if not erzhang or not erzhang:isAlive() or not erzhang:hasSkill("LuaGuzheng") then return false end
+		local current = room:getCurrent()
+		local move = data:toMoveOneTime()
+		if erzhang:objectName() == current:objectName() then return false end
+
+		if current:getPhase() == sgs.Player_Discard then
+			local QguzhengToGet = erzhang:getTag("LuaGuzhengToGet"):toList()
+			local guzhengToGet = sgs.IntList()
+			for _, id in sgs.qlist(QguzhengToGet) do
+				guzhengToGet:append(id:toInt())
+			end
+			local QguzhengOther = erzhang:getTag("LuaGuzhengOther"):toList()
+			local guzhengOther = sgs.IntList()
+			for _, id in sgs.qlist(QguzhengOther) do
+				guzhengOther:append(id:toInt())
+			end
+
+			if bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
+				for _, card_id in sgs.qlist(move.card_ids) do
+					if move.from:objectName() == current:objectName() then
+						if not guzhengToGet:contains(card_id) then
+							QguzhengToGet:append(sgs.QVariant(card_id))
+						end
+					else
+						if not guzhengOther:contains(card_id) then
+							QguzhengOther:append(sgs.QVariant(card_id))
+						end
+					end
+				end
+			end
+            erzhang:setTag("LuaGuzhengToGet",sgs.QVariant(QguzhengToGet))
+            erzhang:setTag("LuaGuzhengOther",sgs.QVariant(QguzhengOther))
+		end
+	end,
+}
+
+LuaGuzhengCard = sgs.CreateSkillCard{
+	name = "LuaGuzhengCard",
+	target_fixed = true,
+	will_throw = false,
+	handling_method = sgs.Card_MethodNone,
+	on_use = function(self,room,source)
+		source:setTag("guzheng_card", sgs.QVariant(self:getSubcards():first()))
+		source:setFlags("guzheng_invoke")
+	end,
+}
+
+LuaGuzhengVS = sgs.CreateOneCardViewAsSkill{
+	name = "LuaGuzheng",
+	response_pattern = "@@LuaGuzheng",
+	view_filter = function(self,to_select)
+		local l = sgs.Self:property("guzheng_toget"):toString():split("+")
+        return table.contains(l, tostring(to_select:getId()))
+	end,
+	view_as = function(self,originalCard)
+		local gz = LuaGuzhengCard:clone()
+		gz:addSubcard(originalCard)
+		return gz
+	end,
+}
+
+LuaGuzheng = sgs.CreateTriggerSkill{
+	name = "LuaGuzheng",
+	events = {sgs.EventPhaseEnd},
+	view_as_skill = LuaGuzhengVS,
+	can_trigger = function(self,event,room,player)
+		local skill_list = {}
+		local name_list = {}
+		if not player or player:getPhase() ~= sgs.Player_Discard then return false end
+		local erzhangs = room:findPlayersBySkillName(self:objectName())
+
+		for _, erzhang in sgs.qlist(erzhangs) do
+			local QguzhengToGet = erzhang:getTag("LuaGuzhengToGet"):toList()
+			local guzheng_cardsToGet = sgs.IntList()
+			for _, id in sgs.qlist(QguzhengToGet) do
+				guzheng_cardsToGet:append(id:toInt())
+			end
+			local QguzhengOther = erzhang:getTag("LuaGuzhengOther"):toList()
+			local guzheng_cardsOther = sgs.IntList()
+			for _, id in sgs.qlist(QguzhengOther) do
+				guzheng_cardsOther:append(id:toInt())
+			end
+			
+			if player:isDead() then return false end
+
+			local cardsToGet = sgs.IntList()
+			for _, card_id in sgs.qlist(guzheng_cardsToGet) do
+				if room:getCardPlace(card_id) == sgs.Player_DiscardPile then
+					cardsToGet:append(card_id)
+				end
+			end
+			local cardsOther = sgs.IntList()
+			for _, card_id in sgs.qlist(guzheng_cardsOther) do
+				if room:getCardPlace(card_id) == sgs.Player_DiscardPile then
+					cardsOther:append(card_id)
+				end
+			end
+
+			if cardsToGet:isEmpty() then
+				erzhang:removeTag("LuaGuzhengToGet")
+				erzhang:removeTag("LuaGuzhengOther")
+                continue
+			else
+				table.insert(skill_list,self:objectName())
+				table.insert(name_list,erzhang:objectName())
+			end
+		end
+        return table.concat(skill_list,"|"),table.concat(name_list,"|")
+	end,
+	
+	on_cost = function(self,event,room,player,data,erzhang)
+		local QguzhengToGet = erzhang:getTag("LuaGuzhengToGet"):toList()
+		local guzheng_cardsToGet = sgs.IntList()
+		for _, id in sgs.qlist(QguzhengToGet) do
+			guzheng_cardsToGet:append(id:toInt())
+		end
+		local QguzhengOther = erzhang:getTag("LuaGuzhengOther"):toList()
+		local guzheng_cardsOther = sgs.IntList()
+		for _, id in sgs.qlist(QguzhengOther) do
+			guzheng_cardsOther:append(id:toInt())
+		end
+		local cards = sgs.IntList()
+		local cardsToGet = {}
+		for _, card_id in sgs.qlist(guzheng_cardsToGet) do
+			if room:getCardPlace(card_id) == sgs.Player_DiscardPile then
+				table.insert(cardsToGet,card_id)
+				cards:append(card_id)
+			end
+		end
+		local cardsOther = {}
+		for _, card_id in sgs.qlist(guzheng_cardsOther) do
+			if room:getCardPlace(card_id) == sgs.Player_DiscardPile then
+				table.insert(cardsOther,card_id)
+				cards:append(card_id)
+			end
+		end
+		
+		erzhang:removeTag("LuaGuzhengToGet")
+		erzhang:removeTag("LuaGuzhengOther")
+
+		local cardsList = table.concat(sgs.QList2Table(cards),"+")
+		room:setPlayerProperty(erzhang, "guzheng_allCards", sgs.QVariant(cardsList))
+		local toGetList = table.concat(cardsToGet,"+")
+		room:setPlayerProperty(erzhang, "guzheng_toget", sgs.QVariant(toGetList))
+
+		erzhang:removeTag("guzheng_card")
+		room:setPlayerFlag(erzhang, "LuaGuzheng_InTempMoving")
+		local r = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_UNKNOWN, erzhang:objectName())
+		local fake_move = sgs.CardsMoveStruct(cards, nil, erzhang, sgs.Player_DiscardPile, sgs.Player_PlaceHand, r)
+		local moves = sgs.CardsMoveList()
+        moves:append(fake_move)
+		local _erzhang = sgs.SPlayerList()
+		_erzhang:append(erzhang)
+		room:notifyMoveCards(true, moves, true, _erzhang)
+        room:notifyMoveCards(false, moves, true, _erzhang)
+		local invoke = room:askForUseCard(erzhang, "@@LuaGuzheng", "@guzheng:" .. player:objectName(), -1, sgs.Card_MethodNone)
+		local fake_move2 = sgs.CardsMoveStruct(cards, erzhang, nil, sgs.Player_PlaceHand, sgs.Player_DiscardPile, r)
+		local moves2 = sgs.CardsMoveList()
+        moves2:append(fake_move2)
+		room:notifyMoveCards(true, moves2, true, _erzhang)
+        room:notifyMoveCards(false, moves2, true, _erzhang)
+		room:setPlayerFlag(erzhang, "-LuaGuzheng_InTempMoving")
+
+		if invoke and erzhang:hasFlag("guzheng_invoke") then
+			erzhang:setFlags("-guzheng_invoke")
+			local to_back = erzhang:getTag("guzheng_card"):toInt()
+			player:obtainCard(sgs.Sanguosha:getCard(to_back))
+			cards:removeOne(to_back)
+			local ids = sgs.VariantList()
+			for _, id in sgs.qlist(cards) do
+				ids:append(sgs.QVariant(id))
+			end
+			erzhang:setTag("GuzhengCards",sgs.QVariant(ids))
+			return true
+		end
+	end,
+	
+	on_effect = function(self,event,room,player,data,erzhang)
+		local Qcards = erzhang:getTag("GuzhengCards"):toList()
+		local cards = sgs.IntList()
+		for _, q in sgs.qlist(Qcards) do
+			cards:append(q:toInt())
+		end
+		erzhang:removeTag("GuzhengCards")
+		if not cards:isEmpty() and room:askForSkillInvoke(erzhang, "_Guzheng", sgs.QVariant("GuzhengObtain")) then
+			local dummy = sgs.DummyCard(cards)
+			room:obtainCard(erzhang, dummy)
+		end
+	end,
+}
+
 --[[
 	观星
 	相关武将：标-诸葛亮
