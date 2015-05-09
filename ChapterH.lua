@@ -10,6 +10,103 @@
 	引用：
 	状态：
 ]]
+
+
+LuaHaoshiCard = sgs.CreateSkillCard{
+	name = "LuaHaoshiCard",
+	will_throw = false,
+	mute = true,
+	handling_method = sgs.Card_MethodNone,
+    m_skillName = "_haoshi",
+	filter = function(self,targets,to_select,Self)
+		if #targets > 0 or to_select:objectName() == Self:objectName() then
+			return false
+		end
+		return to_select:getHandcardNum() == Self:getMark("luahaoshi")
+	end,
+	on_use = function(self,room,source,targets)
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_GIVE, source:objectName(),
+			targets[1]:objectName(), "Luahaoshi", "")
+		room:moveCardTo(self, targets[1], sgs.Player_PlaceHand, reason)
+	end,
+}
+
+LuaHaoshiVS = sgs.CreateViewAsSkill{
+	name = "Luahaoshi",
+	response_pattern = "@@Luahaoshi!",
+
+	view_filter = function(self,selected,to_select)
+		if to_select:isEquipped() then return false end
+		local length = math.floor(sgs.Self:getHandcardNum() / 2)
+		return #selected < length
+	end,
+	view_as = function(self,cards)
+		if #cards ~= math.floor(sgs.Self:getHandcardNum() / 2) then return nil end
+		local card = LuaHaoshiCard:clone()
+		for _, c in ipairs(cards) do
+			card:addSubcard(c)
+		end
+        return card
+	end,
+}
+
+Luahaoshi = sgs.CreateDrawCardsSkill{
+	name = "Luahaoshi",
+	view_as_skill = LuaHaoshiVS,
+	can_preshow = true,
+	on_cost = function(self,event,room,player)
+		if player:askForSkillInvoke(self:objectName()) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
+	end,
+	draw_num_func = function(self,player,n)
+        player:setFlags("luahaoshi")
+        return n + 2
+	end,
+}
+
+LuaHaoshiGive = sgs.CreateTriggerSkill{
+	name = "#Luahaoshi-give",
+	events = {sgs.AfterDrawNCards},
+	frequency = sgs.Skill_Compulsory,
+
+	can_trigger = function(self,event,room,lusu)
+		if not lusu or not lusu:isAlive() or not lusu:hasShownSkill("Luahaoshi") then return false end
+		if lusu:hasFlag("luahaoshi") then
+			lusu:setFlags("-luahaoshi")
+			if lusu:getHandcardNum() <= 5 then return false end
+            return self:objectName()
+		end
+	end,
+	on_effect = function(self,event,room,lusu)
+		local other_players = room:getOtherPlayers(lusu)
+		local least = 1000
+		for _, player in sgs.qlist(other_players) do
+            least = math.min(player:getHandcardNum(), least)
+		end
+		room:setPlayerMark(lusu, "luahaoshi", least)
+		if not room:askForUseCard(lusu, "@@Luahaoshi!", "@haoshi", -1, sgs.Card_MethodNone) then
+			--force lusu to give his half cards
+			local beggar
+			for _, player in sgs.qlist(other_players) do
+				if player:getHandcardNum() == least then
+                    beggar = player
+                    break
+				end
+			end
+			local n = math.floor(lusu:getHandcardNum() / 2)
+			local to_give = lusu:handCards():mid(0, n)
+			local haoshi_card = LuaHaoshiCard:clone()
+			for _, card_id in sgs.qlist(to_give) do
+				haoshi_card:addSubcard(card_id)
+			end
+			local targets = {beggar}
+			haoshi_card:on_use(room, player, targets)
+		end
+	end,
+}
+
 --[[
 	鹤翼
 	相关武将：阵-曹洪
