@@ -132,6 +132,43 @@ LuaZhiheng = sgs.CreateViewAsSkill{
 	引用：
 	状态：
 ]]
+
+LuaZhijianCard = sgs.CreateSkillCard{
+	name = "LuaZhijianCard",
+	will_throw = false,
+	handling_method = sgs.Card_MethodNone,
+	filter = function(self, targets, to_select, erzhang)
+		if #targets ~= 0 or to_select:objectName() == erzhang:objectName() then return false end
+		local card = sgs.Sanguosha:getCard(self:getSubcards():first())
+		local equip = card:getRealCard():toEquipCard()
+		local equip_index = equip:location()
+		return to_select:getEquip(equip_index) == nil
+	end,
+	extra_cost = function(self,room,card_use)
+		local erzhang = card_use.from;
+		room:moveCardTo(self, erzhang, card_use.to:first(), sgs.Player_PlaceEquip, sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PUT, erzhang:objectName(), "LuaZhijian", ""))
+		local log = sgs.LogMessage()
+		log.type = "$ZhijianEquip"
+		log.from = card_use.to:first()
+		log.card_str = self:getEffectiveId()
+		room:sendLog(log)
+	end,
+	on_effect = function(self, effect)
+		effect.from:drawCards(1)
+	end,
+}
+
+LuaZhijian = sgs.CreateOneCardViewAsSkill{
+	name = "LuaZhijian",
+	filter_pattern = "EquipCard|.|.|hand",
+	view_as = function(self, card)
+		local zhijian_card = LuaZhijianCard:clone()
+		zhijian_card:addSubcard(card)
+		zhijian_card:setShowSkill(self:objectName())
+		return zhijian_card
+	end
+}
+
 --[[
 	资粮
 	相关武将：阵-邓艾
