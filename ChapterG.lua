@@ -162,13 +162,13 @@ LuaGuzheng = sgs.CreateTriggerSkill{
 			if cardsToGet:isEmpty() then
 				erzhang:removeTag("LuaGuzhengToGet")
 				erzhang:removeTag("LuaGuzhengOther")
-                continue
+				continue
 			else
 				table.insert(skill_list,self:objectName())
 				table.insert(name_list,erzhang:objectName())
 			end
 		end
-        return table.concat(skill_list,"|"),table.concat(name_list,"|")
+		return table.concat(skill_list,"|"),table.concat(name_list,"|")
 	end,
 	
 	on_cost = function(self,event,room,player,data,erzhang)
@@ -200,7 +200,9 @@ LuaGuzheng = sgs.CreateTriggerSkill{
 		
 		erzhang:removeTag("LuaGuzhengToGet")
 		erzhang:removeTag("LuaGuzhengOther")
-
+		
+		if #cardsToGet == 0 then return false end
+		
 		local cardsList = table.concat(sgs.QList2Table(cards),"+")
 		room:setPlayerProperty(erzhang, "guzheng_allCards", sgs.QVariant(cardsList))
 		local toGetList = table.concat(cardsToGet,"+")
