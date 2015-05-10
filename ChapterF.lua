@@ -226,6 +226,56 @@ luaFangzhu = sgs.CreateTriggerSkill{
 	状态：
 ]]
 
+
+LuaFenxunCard = sgs.CreateSkillCard{
+	name = "LuaFenxunCard",
+
+	filter = function(self,targets,to_select,Self)
+		return #targets == 0 and to_select:objectName() ~= Self:objectName()
+	end,
+	on_effect = function(self, effect)
+		local room = effect.from:getRoom()
+		local d = sgs.QVariant()
+		d:setValue(effect.to)
+		effect.from:setTag("FenxunTarget",d)
+		room:setFixedDistance(effect.from, effect.to, 1)
+	end,
+}
+
+LuaFenxunVS = sgs.CreateOneCardViewAsSkill{
+	name = "LuaFenxun",
+	filter_pattern = ".!",
+	enabled_at_play = function(self,player)
+		return player:canDiscard(player, "he") and not player:hasUsed("#LuaFenxunCard")
+	end,
+	view_as = function(self,card)
+		local first = LuaFenxunCard:clone()
+		first:addSubcard(card)
+		first:setSkillName(self:objectName())
+        first:setShowSkill(self:objectName())
+		return first
+	end,
+}
+
+LuaFenxun = sgs.CreateTriggerSkill{
+	name = "LuaFenxun",
+	events = {sgs.EventPhaseChanging,sgs.Death},
+	view_as_skill = LuaFenxunVS,
+	can_trigger = function(self,event,room,dingfeng,data)
+		if not dingfeng or not dingfeng:getTag("FenxunTarget"):toPlayer() then return false end
+		if event == sgs.EventPhaseChanging then
+			local change = data:toPhaseChange()
+			if change.to ~= sgs.Player_NotActive then return false end
+		else
+			local death = data:toDying()
+			if death.who:objectName() ~= dingfeng:objectName() then return false end
+		end
+		local target = dingfeng:getTag("FenxunTarget"):toPlayer()
+		room:setFixedDistance(dingfeng, target, -1)
+		dingfeng:removeTag("FenxunTarget")
+	end,
+}
+
 --[[
 	锋矢
 	相关武将：势-张任
