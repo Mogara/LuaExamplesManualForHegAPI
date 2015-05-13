@@ -17,6 +17,26 @@
 	引用：
 	状态：
 ]]
+
+LuaJijiu = sgs.CreateOneCardViewAsSkill{
+	name = "LuaJijiu",
+	filter_pattern = ".|red",
+	response_or_use = true,
+	enabled_at_play = function(self)
+		return false
+	end,
+	enabled_at_response = function(self,player,pattern)
+		return pattern:match("peach") and not player:hasFlag("Global_PreventPeach") and player:getPhase() == sgs.Player_NotActive
+	end,
+	view_as = function(self,ocard)
+		local peach = sgs.Sanguosha:cloneCard("peach",ocard:getSuit(), ocard:getNumber())
+		peach:addSubcard(ocard:getId())
+		peach:setSkillName(self:objectName())
+		peach:setShowSkill(self:objectName())
+        return peach
+	end
+}
+
 --[[
 	急袭
 	相关武将：阵-邓艾
