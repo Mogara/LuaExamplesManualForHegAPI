@@ -290,7 +290,7 @@ luatieqi = sgs.CreateTriggerSkill {
 			log.type = "#NoJink"
 			log.from = player
 			room:sendLog(log)
-			local index = listIndexOf(use.to, player)
+			local index = use.to:indexOf(player)
 			jink_list:replace(index,sgs.QVariant(0))
 			room:broadcastSkillInvoke(self:objectName(),2,ask_who)
 		end
