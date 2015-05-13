@@ -201,6 +201,36 @@ luaQingguo = sgs.CreateOneCardViewAsSkill{
 	引用：
 	状态：
 ]]
+
+
+LuaQingnangCard = sgs.CreateSkillCard{
+	name = "LuaQingnangCard",
+	filter = function(self,targets,to_select)
+		return #targets == 0 and to_select:isWounded()
+	end,
+	on_effect = function(self,effect)
+		local recover = sgs.RecoverStruct()
+		recover.card = self
+		recover.who = effect.from
+		effect.to:getRoom():recover(effect.to, recover)
+	end,
+}
+
+LuaQingnang = sgs.CreateOneCardViewAsSkill{
+	name = "LuaQingnang",
+	filter_pattern = ".|.|.|hand!",
+
+	enabled_at_play = function(self,player)
+		return player:canDiscard(player, "h") and not player:hasUsed("#LuaQingnang")
+	end,
+	view_as = function(self, ocard)
+		local qingnang_card = LuaQingnangCard:clone()
+		qingnang_card:addSubcard(ocard:getId())
+		qingnang_card:setShowSkill(self:objectName())
+		return qingnang_card
+	end,
+}
+
 --[[
 	巧变
 	相关武将：标-张郃
