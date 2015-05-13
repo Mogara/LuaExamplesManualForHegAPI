@@ -17,6 +17,86 @@
 	引用：
 	状态：
 ]]
+
+LuaLijianCard = sgs.CreateSkillCard{
+	name = "LuaLijianCard",
+	mute = true,
+
+	filter = function(self,targets,to_select,Self)
+		if not to_select:isMale() then return false end
+		local duel = sgs.Sanguosha:cloneCard("duel", sgs.Card_NoSuit, 0)
+		if #targets == 1 and (to_select:isCardLimited(duel, sgs.Card_MethodUse) or to_select:isProhibited(targets[1], duel)) then return false end
+		duel:deleteLater()
+		return #targets < 2 and to_select:objectName() ~= Self:objectName()
+	end,
+	
+	feasible = function(self,targets)
+		return #targets == 2
+	end,
+
+	about_to_use = function(self,room,use)
+		local diaochan = use.from
+		local log = sgs.LogMessage()
+		log.from = diaochan
+		for _, p in sgs.qlist(use.to) do
+			log.to:append(p)
+		end
+		log.type = "#UseCard"
+		log.card_str = self:toString()
+		room:sendLog(log)
+		local data = sgs.QVariant()
+		data:setValue(use)
+		local thread = room:getThread()
+
+		thread:trigger(sgs.PreCardUsed, room, diaochan, data)
+		room:broadcastSkillInvoke("LuaLijian", diaochan)
+
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_THROW, diaochan:objectName(), "", "LuaLijian", "")
+		room:moveCardTo(self, diaochan, nil, sgs.Player_PlaceTable, reason, true)
+
+		if diaochan:ownSkill("LuaLijian") and not diaochan:hasShownSkill("LuaLijian") then
+			diaochan:showGeneral(diaochan:inHeadSkills("LuaLijian"))
+		end
+	
+		local table_ids = room:getCardIdsOnTable(self)
+		if not table_ids:isEmpty() then
+			local dummy = sgs.DummyCard(table_ids)
+			room:moveCardTo(dummy, diaochan, nil, sgs.Player_DiscardPile, reason, true)
+		end
+
+		thread:trigger(sgs.CardUsed, room, diaochan, data)
+		thread:trigger(sgs.CardFinished, room, diaochan, data)
+	end,
+	on_use = function(self,room,player,targets)
+		local to = targets[1]
+		local from = targets[2]
+
+		local duel = sgs.Sanguosha:cloneCard("duel", sgs.Card_NoSuit, 0)
+		duel:setSkillName(string.format("_%s", self:getSkillName()))
+		if not from:isCardLimited(duel, sgs.Card_MethodUse) and not from:isProhibited(to, duel) then
+			room:useCard(sgs.CardUseStruct(duel, from, to))
+		else
+			duel:deleteLater()
+		end
+	end,
+}
+
+
+LuaLijian = sgs.CreateOneCardViewAsSkill{
+	name = "LuaLijian",
+	filter_pattern = ".!",
+	enabled_at_play = function(self,player)
+		return player:getAliveSiblings():length() > 1
+			and player:canDiscard(player, "he") and not player:hasUsed("#LuaLijianCard")
+	end,
+	view_as = function(self,ocard)
+		local lijian_card = LuaLijianCard:clone()
+		lijian_card:addSubcard(ocard)
+		lijian_card:setShowSkill(self:objectName())
+		return lijian_card
+	end,
+}
+
 --[[
 	礼让
 	相关武将：标-孔融
