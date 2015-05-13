@@ -77,7 +77,72 @@ LuaWusheng = sgs.CreateOneCardViewAsSkill{
 	描述：锁定技，每当你使用【杀】指定一名角色为目标后，该角色需依次使用两张【闪】才能抵消此【杀】；锁定技，每当你使用【决斗】指定一名角色为目标后，或成为一名角色使用【决斗】的目标后，该角色每次响应此【决斗】需依次打出两张【杀】。 
 	引用：
 	状态：
+	备注：无双决斗部分在源码中
 ]]
+
+
+LuaWushuang = sgs.CreateTriggerSkill{
+	name = "LuaWushuang",
+	events = {sgs.TargetChosen,sgs.TargetConfirmed,sgs.CardFinished},
+	frequency = sgs.Skill_Compulsory,
+
+	can_trigger = function(self,event,room,player,data)
+		if not player then return false end
+		local use = data:toCardUse()
+		if event == sgs.TargetChosen then
+			if use.card and (use.card:isKindOf("Slash") or use.card:isKindOf("Duel")) then
+				if player:isAlive() and player:hasSkill(self:objectName()) then
+					local targets = {}
+					for _, p in sgs.qlist(use.to) do
+						table.insert(targets, p:objectName())
+					end
+					if #targets > 0 then return self:objectName() .. "->" .. table.concat(targets,"+") end
+				end
+			end
+		elseif event == sgs.TargetConfirmed then
+			if not use.to:contains(player) then return false end
+            if use.card and use.card:isKindOf("Duel") and player:isAlive() and player:hasSkill(self:objectName()) then
+				return self:objectName() .. "->" .. use.from:objectName()
+			end
+		elseif event == sgs.CardFinished then
+			if use.card:isKindOf("Duel") then
+				for _, lvbu in sgs.qlist(room:getAllPlayers()) do
+					if lvbu:getMark("WushuangTarget") > 0 then
+						room:setPlayerMark(lvbu, "WushuangTarget", 0)
+					end
+				end
+			end
+		end
+	end,
+	on_cost = function(self,event,room,target,data,ask_who)
+		ask_who:setTag("WushuangData",data)			--for AI
+		local d = sgs.QVariant()
+		d:setValue(target)
+		local invoke = ask_who:hasShownSkill(self:objectName()) or ask_who:askForSkillInvoke(self:objectName(), d)
+        ask_who:removeTag("WushuangData")
+		if invoke then
+			room:broadcastSkillInvoke(self:objectName(), ask_who)
+			return true
+		end
+	end,
+	
+	on_effect = function(self,event,room,target,data,ask_who)
+		room:sendCompulsoryTriggerLog(ask_who, self:objectName(),true)
+		local use = data:toCardUse()
+		if use.card:isKindOf("Slash") then
+			if event ~= sgs.TargetChosen then return false end
+			local x = use.to:indexOf(target)
+			local jink_list = ask_who:getTag("Jink_" .. use.card:toString()):toList()
+			if (jink_list:at(x):toInt() == 1) then
+				jink_list:replace(x,sgs.QVariant(2))
+			end
+            ask_who:setTag("Jink_" .. use.card:toString(),sgs.QVariant(jink_list))
+		elseif use.card:isKindOf("Duel") then
+			room:setPlayerMark(ask_who, "WushuangTarget", 1)
+		end
+	end,
+}
+
 --[[
 	悟心
 	相关武将：势-君张角
