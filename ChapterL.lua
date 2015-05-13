@@ -86,7 +86,7 @@ LuaLiegong = sgs.CreateTriggerSkill{
 		log.type = "#NoJink"
 		log.from = target
 		room:sendLog(log)
-		local index = listIndexOf(use.to, target)
+		local index = use.to:indexOf(target)
 		jink_list:replace(index,sgs.QVariant(0))
 		player:setTag("Jink_"..use.card:toString(), sgs.QVariant(jink_list))
 	end,
