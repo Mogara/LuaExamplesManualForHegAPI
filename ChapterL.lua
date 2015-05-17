@@ -453,6 +453,35 @@ LuaLongdan = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaLuanji = sgs.CreateViewAsSkill{
+	name = "LuaLuanji",
+	response_or_use = true,
+	view_filter = function(self,selected,to_select)
+		if #selected == 0 then
+			return not to_select:isEquipped()
+        elseif #selected == 1 then
+			local card = selected[1]
+			return not to_select:isEquipped() and to_select:getSuit() == card:getSuit()
+		else
+            return false
+		end
+	end,
+	view_as = function(self,cards)
+		if #cards == 2 then
+			local aa = sgs.Sanguosha:cloneCard("archery_attack", sgs.Card_SuitToBeDecided, 0)
+			for _, c in ipairs(cards) do
+				aa:addSubcard(c)
+			end
+			aa:setSkillName(self:objectName())
+			aa:setShowSkill(self:objectName())
+			return aa
+		else
+			return nil
+		end
+	end,
+}
+
 --[[
 	乱武
 	相关武将：标-贾诩
