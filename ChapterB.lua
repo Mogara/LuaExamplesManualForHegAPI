@@ -58,6 +58,25 @@ LuaBazhen = sgs.CreateTriggerSkill{
 	状态：
 ]]
 
+LuaBiyue = sgs.CreatePhaseChangeSkill{
+	name = "LuaBiyue",
+	frequency = sgs.Skill_Frequent,
+	can_trigger = function(self,event,room,player)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Finish then
+			return self:objectName()
+		end
+	end,
+	on_cost = function(self,event,room,player)
+		if player:askForSkillInvoke(self:objectName()) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+            return true
+		end
+	end,
+	on_phasechange = function(self,player)
+		player:drawCards(1)
+	end,
+}
+
 --[[
 	不屈
 	相关武将：标-周泰
