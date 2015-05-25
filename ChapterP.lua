@@ -13,6 +13,7 @@
 
 LuaPaoxiao = sgs.CreateTargetModSkill{
 	name = "LuaPaoxiao",
+	pattern = "Slash",
 	residue_func = function(self, from, card)
         if not sgs.Sanguosha:matchExpPattern("Slash", from, card) then return 0 end
         if from:hasSkill(self:objectName()) then
