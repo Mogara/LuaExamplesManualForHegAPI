@@ -13,7 +13,7 @@
 
 LuaBazhen = sgs.CreateTriggerSkill{
 	name = "LuaBazhen",
-	frequency = sgs.Skil_Compulsory,
+	frequency = sgs.Skill_Compulsory,
 	events = {sgs.CardAsked},
 
 	can_trigger = function(self, event, room, player, data)
