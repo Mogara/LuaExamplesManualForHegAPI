@@ -422,8 +422,49 @@ LuaGuicai = sgs.CreateTriggerSkill{
 	相关武将：标-张角
 	描述：每当一名角色的判定牌生效前，你可以打出一张黑色牌替换之。 
 	引用：
-	状态：
+	状态：版本1.2以上适用
 ]]
+
+LuaGuidao = sgs.CreateTriggerSkill{
+	name = "LuaGuidao",
+	events = {sgs.AskForRetrial},
+
+	can_trigger = function(self,event,room,player,data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		if player:isKongcheng() and player:getHandPile():isEmpty() then
+			local has_black = false
+			for i = 0, i < 4, 1 do
+				local equip = player:getEquip(i)
+				if equip and equip:isBlack() then
+					has_black = true
+					break
+				end
+			end
+			return has_black and self:objectName() or false
+		end
+        return self:objectName()
+	end,
+
+	on_cost = function(self,event,room,player,data)
+		local judge = data:toJudge()
+		local prompt_list = {"@guidao-card", judge.who:objectName(),
+			self:objectName(), judge.reason, judge.card:getEffectiveId()}
+
+		local card = room:askForCard(player, ".|black", table.concat(prompt_list, ":"), data, sgs.Card_MethodResponse, judge.who, true)
+
+		if card then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			room:retrial(card, player, judge, self:objectName(), true)
+			return true
+		end
+	end,
+
+	on_effect = function(self,event,room,player,data)
+		local judge = data:toJudge()
+		judge:updateResult()
+	end,
+}
+
 --[[
 	国色
 	相关武将：标-大乔
