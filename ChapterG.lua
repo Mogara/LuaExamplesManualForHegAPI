@@ -422,7 +422,7 @@ LuaGuicai = sgs.CreateTriggerSkill{
 	相关武将：标-张角
 	描述：每当一名角色的判定牌生效前，你可以打出一张黑色牌替换之。 
 	引用：
-	状态：版本1.2以上适用
+	状态：
 ]]
 
 LuaGuidao = sgs.CreateTriggerSkill{
