@@ -10,6 +10,54 @@
 	引用：
 	状态：
 ]]
+
+LuaLeiji = sgs.CreateTriggerSkill{
+	name = "LuaLeiji",
+	events = {sgs.CardResponded},
+
+	can_trigger = function(self,event,room,player,data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local card_star = data:toCardResponse().m_card
+		if card_star:isKindOf("Jink") then
+			return self:objectName()
+		end
+	end,
+
+	on_cost = function(self,event,room,player,data)
+		local target = room:askForPlayerChosen(player, room:getAlivePlayers(), self:objectName(), "leiji-invoke", true, true)
+		if target then
+			local d = sgs.QVariant()
+			d:setValue(target)
+			player:setTag("leiji-target", d)
+            room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
+	end,
+
+    on_effect = function(self,event,room,player,data)
+		local card_star = data:toCardResponse().m_card
+		if card_star:isKindOf("Jink") then
+			local target = player:getTag("leiji-target"):toPlayer()
+			player:removeTag("leiji-target")
+			if target then
+
+				judge = sgs.JudgeStruct()
+				judge.pattern = ".|spade"
+				judge.good = false
+				judge.negative = true
+				judge.reason = self:objectName()
+				judge.who = target
+
+				room:judge(judge)
+
+				if judge:isBad() then
+					room:damage(sgs.DamageStruct(self:objectName(), player, target, 2, sgs.DamageStruct_Thunder))
+				end
+			end
+		end
+	end,
+}
+
 --[[
 	离间
 	相关武将：标-貂蝉
