@@ -24,6 +24,37 @@
 	引用：
 	状态：
 ]]
+
+LuaWeimu = sgs.CreateTriggerSkill{
+	name = "LuaWeimu",
+	events = {sgs.TargetConfirming},
+	frequency = sgs.Skill_Compulsory,
+
+    can_trigger = function(self,event,room,player,data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+        local use = data:toCardUse()
+		if not use.card or use.card:getTypeId() ~= sgs.Card_TypeTrick or not use.card:isBlack() then return false end
+		if not use.to:contains(player) then return false end
+		return self:objectName()
+	end,
+
+	on_cost = function(self,event,room,player,data)
+		if player:hasShownSkill(self:objectName()) or player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
+	end,
+
+	on_effect = function(self,event,room,player,data)
+        room:sendCompulsoryTriggerLog(player, self:objectName(), true)
+        local use = data:toCardUse()
+
+        sgs.Room_cancelTarget(use, player)
+		data:setValue(use)
+        return false
+	end,
+}
+
 --[[
 	问道
 	相关武将：势-君张角
