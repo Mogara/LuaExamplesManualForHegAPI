@@ -489,6 +489,66 @@ LuaLuanji = sgs.CreateViewAsSkill{
 	引用：
 	状态：
 ]]
+
+LuaLuanwuCard = sgs.CreateSkillCard{
+	name = "LuaLuanwuCard",
+	target_fixed = true,
+	mute = true,
+	about_to_use = function(self, room, use)
+		room:removePlayerMark(use.from, "@chaos")
+		room:broadcastSkillInvoke("LuaLuanwu", use.from)
+		room:doSuperLightbox("jiaxu", "LuaLuanwu")
+		
+		local new_use = use
+		for _, p in sgs.qlist(room:getOtherPlayers(use.from)) do
+			new_use.to:append(p)
+		end
+		self:cardOnUse(room, new_use)
+
+	end,
+	on_effect = function(self,effect)
+		local room = effect.to:getRoom()
+		local players = room:getOtherPlayers(effect.to)
+		local distance_list = {}
+		local nearest = 1000
+		for _, p in sgs.qlist(players) do
+			local distance = effect.to:distanceTo(p)
+			table.insert(distance_list,distance)
+			if distance ~= -1 then
+				nearest = math.min(nearest, distance)
+			end
+		end
+
+		local luanwu_targets = sgs.SPlayerList()
+		for i = 1, #distance_list, 1 do
+			if distance_list[i] == nearest and effect.to:canSlash(players:at(i - 1), nil, false) then
+				luanwu_targets:append(players:at(i - 1))
+			end
+		end
+
+		if (luanwu_targets:isEmpty() or not room:askForUseSlashTo(effect.to, luanwu_targets, "@luanwu-slash")) then
+			room:loseHp(effect.to)
+		end
+	end,
+}
+
+LuaLuanwuVS = sgs.CreateZeroCardViewAsSkill{
+	name = "LuaLuanwu",
+	view_as = function(self)
+		return LuaLuanwuCard:clone()
+	end,
+	enabled_at_play = function(self,player)
+		return player:getMark("@chaos") >= 1
+	end,
+}
+
+LuaLuanwu = sgs.CreateTriggerSkill{
+	name = "LuaLuanwu",
+	frequency = sgs.Skill_Limited,
+	limit_mark = "@chaos",
+	view_as_skill = LuaLuanwuVS,
+}
+
 --[[
 	洛神
 	相关武将：标-甄姬
