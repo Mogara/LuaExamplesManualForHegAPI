@@ -27,6 +27,36 @@ LuaMashu = sgs.CreateDistanceSkill{
 	引用：
 	状态：
 ]]
+
+LuaMengjin = sgs.CreateTriggerSkill{
+	name = "LuaMengjin",
+	events = {sgs.SlashMissed},
+	frequency = sgs.Skill_Frequent,
+
+    can_trigger = function(self,event,room,player,data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local effect = data:toSlashEffect()
+		if effect.to:isAlive() and player:canDiscard(effect.to, "he") then
+			return self:objectName()
+		end
+	end,
+
+	on_cost = function(self,event,room,pangde,data)
+		local effect = data:toSlashEffect()
+		if pangde:askForSkillInvoke(self:objectName(), data) then
+			room:doAnimate(1, pangde:objectName(), effect.to:objectName())
+			room:broadcastSkillInvoke(self:objectName(), pangde)
+            return true
+		end
+	end,
+	
+    on_effect = function(self,event,room,pangde,data)
+        local effect = data:toSlashEffect()
+		local to_throw = room:askForCardChosen(pangde, effect.to, "he", self:objectName(), false, sgs.Card_MethodDiscard)
+		room:throwCard(sgs.Sanguosha:getCard(to_throw), effect.to, pangde)
+	end,
+}
+
 --[[
 	名士
 	相关武将：标-孔融
