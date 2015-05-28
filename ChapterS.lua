@@ -313,6 +313,100 @@ LuaShushen = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaShuangxiongVS = sgs.CreateOneCardViewAsSkill{
+	name = "LuaShuangxiong",
+	response_or_use = true,
+	enabled_at_play = function(self,player)
+		return player:getMark("shuangxiong") ~= 0 and not player:isKongcheng()
+	end,
+	view_filter = function(self, card)
+		if card:isEquipped() then return false end
+		local value = sgs.Self:getMark("shuangxiong")
+		if value == 1 then
+			return card:isBlack()
+		elseif value == 2 then
+			return card:isRed()
+		end
+		return false
+	end,
+	view_as = function(self,ocard)
+		local duel = sgs.Sanguosha:cloneCard("duel", ocard:getSuit(), ocard:getNumber())
+		duel:addSubcard(ocard)
+		duel:setSkillName("_LuaShuangxiong")
+		return duel
+	end,
+}
+
+LuaShuangxiong = sgs.CreateTriggerSkill{
+	name = "LuaShuangxiong",
+	events = {sgs.EventPhaseStart, sgs.EventPhaseChanging},
+	view_as_skill = LuaShuangxiongVS,
+	can_preshow = true,
+	can_trigger = function(self, event, room, player, data)
+		if not player or player:isDead() then return false end
+		if event == sgs.EventPhaseStart and player:getPhase() == sgs.Player_Start then
+			room:setPlayerMark(player, "shuangxiong", 0)
+		elseif player:getPhase() == sgs.Player_Draw and player:hasSkill(self:objectName()) then
+			return self:objectName()
+		elseif event == sgs.EventPhaseChanging then
+			local change = data:toPhaseChange()
+			if change.to == sgs.Player_NotActive and player:hasFlag("shuangxiong") then
+				room:setPlayerFlag(player, "-shuangxiong")
+			end
+		end
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName()) then
+			room:broadcastSkillInvoke(self:objectName(), 1)
+			return true
+		end
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		if player:getPhase() == sgs.Player_Draw and player:hasSkill(self:objectName()) then
+			room:setPlayerFlag(player, "shuangxiong")
+	
+			local judge = sgs.JudgeStruct()
+			judge.good = true
+			judge.play_animation = false
+			judge.reason = self:objectName()
+			judge.who = player
+	
+			room:judge(judge)
+			local n = judge.pattern == "red" and 1 or 2
+			room:setPlayerMark(player, "shuangxiong", n)
+		
+			return true
+		end
+	end,
+}
+	
+LuaShuangxiongGet = sgs.CreateTriggerSkill{
+	name = "#LuaShuangxiong",
+
+	events = {sgs.FinishJudge},
+	frequency = sgs.Skill_Compulsory,
+	can_preshow = false,
+	
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() then
+			local judge = data:toJudge()
+			if judge.reason == "LuaShuangxiong" then
+				judge.pattern = judge.card:isRed() and "red" or "black"
+				if room:getCardPlace(judge.card:getEffectiveId()) == sgs.Player_PlaceJudge then
+					return self:objectName()
+				end
+			end
+		end
+	end,
+	on_effect = function(self,room,event,player,data)
+		local judge = data:toJudge()
+		judge.who:obtainCard(judge.card)
+	end,
+}
+
 --[[
 	死谏
 	相关武将：标-田丰
