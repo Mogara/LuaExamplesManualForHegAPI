@@ -135,6 +135,7 @@ luaQiangxiCard = sgs.CreateSkillCard{
 
 	on_effect = function(self, effect)
 		local room = effect.to:getRoom()
+		effect.from:showGeneral(effect.from:inHeadSkills("qiangxi"))
 		room:damage(sgs.DamageStruct("luaQiangxi", effect.from, effect.to))
 	end,
 }
