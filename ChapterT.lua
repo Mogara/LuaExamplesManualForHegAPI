@@ -66,7 +66,6 @@ LuaTianxiangVS = sgs.CreateOneCardViewAsSkill{
 		local tianxiangCard = LuaTianxiangCard:clone()
 		tianxiangCard:addSubcard(card)		
 		tianxiangCard:setSkillName(self:objectName())
-		tianxiangCard:setShowSkill(self:objectName())
         return tianxiangCard
 	end,
 	
