@@ -338,7 +338,6 @@ LuaLiuliVS = sgs.CreateOneCardViewAsSkill{
 	view_as = function(self, card)
 		local liuli_card = LuaLiuliCard:clone()
 		liuli_card:addSubcard(card)
-        liuli_card:setShowSkill(self:objectName())
 		liuli_card:setSkillName(self:objectName())
 		return liuli_card
 	end,
