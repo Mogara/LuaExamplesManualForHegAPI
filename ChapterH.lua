@@ -149,9 +149,17 @@ LuaHongyanVS = sgs.CreateFilterSkill{
 	name = "LuaHongyan",
 	view_filter = function(self, to_select)
 		local room = sgs.Sanguosha:currentRoom()
-		for _, p in sgs.qlist(room:getPlayers()) do
-			if p:ownSkill(self:objectName()) and p:hasShownSkill(self:objectName()) then
-				return to_select:getSuit() == sgs.Card_Spade
+		if room then
+			for _, p in sgs.qlist(room:getPlayers()) do
+				if p:ownSkill(self:objectName()) and p:hasShownSkill(self:objectName()) then
+					return to_select:getSuit() == sgs.Card_Spade
+				end
+			end
+		else
+			for _, p in sgs.qlist(sgs.Self:getAliveSiblings()) do
+				if p:ownSkill(self:objectName()) and p:hasShownSkill(self:objectName()) then
+					return to_select:getSuit() == sgs.Card_Spade
+				end
 			end
 		end
 		return false
