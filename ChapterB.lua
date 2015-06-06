@@ -86,7 +86,10 @@ LuaBiyue = sgs.CreatePhaseChangeSkill{
 	状态：
 ]]
 
---不屈
+function sortfunction(a,b)
+	return sgs.Sanguosha:getCard(a):getNumber() < sgs.Sanguosha:getCard(b):getNumber()
+end
+
 function LuaRemove(zhoutai)
 		local room = zhoutai:getRoom()
 		local buqu = zhoutai:getPile("luabuqu")
@@ -104,11 +107,34 @@ function LuaRemove(zhoutai)
 		else
 			local to_remove = buqu:length() - need
 			for i = 1, to_remove, 1 do
-				room:fillAG(buqu, zhoutai)
-				--int aidelay = Config.AIDelay;
-				--Config.AIDelay = 0;
+				local buqu = sgs.QList2Table(zhoutai:getPile("luabuqu"))
+				local duplicate_numbers = {}
+				for _, card_id in ipairs(buqu) do
+					for _, id in ipairs(buqu) do
+						if sgs.Sanguosha:getCard(card_id):getNumber() == sgs.Sanguosha:getCard(id):getNumber()
+							and not table.contains(duplicate_numbers, id) and card_id ~= id then
+							table.insert(duplicate_numbers, id)
+							if not table.contains(duplicate_numbers, card_id) then
+                                table.insert(duplicate_numbers, card_id)
+							end
+						end
+					end
+				end
+				local buqu_list = sgs.IntList()
+				if #duplicate_numbers > 0 then
+					table.sort(duplicate_numbers, sortfunction(a,b))
+					for _, id in ipairs(duplicate_numbers) do
+						buqu_list:append(id)
+					end
+				else
+					table.sort(buqu, sortfunction(a,b))
+					for _, id in ipairs(buqu) do
+						buqu_list:append(id)
+					end
+				end
+				room:fillAG(buqu_list, zhoutai)
 				local card_id = room:askForAG(zhoutai, buqu, false, "LuaBuqu")
-				--Config.AIDelay = aidelay;
+
 				local log = sgs.LogMessage()
 				log.type = "$BuquRemove"
 				log.from = zhoutai
@@ -168,34 +194,6 @@ LuaBuqu = sgs.CreateTriggerSkill{
 				room:broadcastSkillInvoke(self:objectName(), zhoutai)
 				room:setPlayerFlag(zhoutai, "-Global_Dying")
 				return self:objectName()
-			else
-				local log = sgs.LogMessage()
-				log.type = "#BuquDuplicate"
-				log.from = zhoutai
-				log.arg = #duplicate_numbers
-                room:sendLog(log)
-
-				for i = 1, #duplicate_numbers, 1 do
-					local number = duplicate_numbers[i]
-
-					local log = sgs.LogMessage()
-                    log.type = "#BuquDuplicateGroup"
-                    log.from = zhoutai
-                    log.arg = i
-					local number_string = {"-","A","2","3","4","5","6","7","8","9","10","J","Q","K"}
-					log.arg2 = number_string[number]
-					room:sendLog(log)
-					for _, card_id in sgs.qlist(buqu) do
-						local card = sgs.Sanguosha:getCard(card_id)
-						if card:getNumber() == number then
-							local log = sgs.LogMessage()
-							log.type = "$BuquDuplicateItem"
-							log.from = zhoutai
-							log.card_str = card_id
-							room:sendLog(log)
-						end
-					end
-				end
 			end
 		end
 	end,
@@ -240,6 +238,34 @@ LuaBuqu = sgs.CreateTriggerSkill{
 			if #duplicate_numbers == 0 then
 				room:removeTag("LuaBuqu")
                 return true
+			else
+				local log = sgs.LogMessage()
+				log.type = "#BuquDuplicate"
+				log.from = zhoutai
+				log.arg = #duplicate_numbers
+                room:sendLog(log)
+
+				for i = 1, #duplicate_numbers, 1 do
+					local number = duplicate_numbers[i]
+
+					local log = sgs.LogMessage()
+                    log.type = "#BuquDuplicateGroup"
+                    log.from = zhoutai
+                    log.arg = i
+					local number_string = {"-","A","2","3","4","5","6","7","8","9","10","J","Q","K"}
+					log.arg2 = number_string[number]
+					room:sendLog(log)
+					for _, card_id in sgs.qlist(buqunew) do
+						local card = sgs.Sanguosha:getCard(card_id)
+						if card:getNumber() == number then
+							local log = sgs.LogMessage()
+							log.type = "$BuquDuplicateItem"
+							log.from = zhoutai
+							log.card_str = card_id
+							room:sendLog(log)
+						end
+					end
+				end
 			end
 		end
 	end,
