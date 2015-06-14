@@ -160,6 +160,80 @@ luaXingshang = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaXiongyiCard = sgs.CreateSkillCard{
+	name = "LuaXiongyiCard",
+	mute = true,
+	target_fixed = true,
+
+	about_to_use = function(self,room,use)
+		room:setPlayerMark(use.from, "@arise", 0)
+		room:broadcastSkillInvoke("LuaXiongyi", use.from)
+		room:doSuperLightbox("mateng", "LuaXiongyi")
+		self:cardOnUse(room, use)
+	end,
+	on_use = function(self,room,source)
+		local targets = sgs.SPlayerList()
+		for _, p in sgs.qlist(room:getAllPlayers()) do
+			if p:isFriendWith(source) then
+				room:doAnimate(1, source:objectName(), p:objectName())
+				targets:append(p)
+			end
+		end
+		room:sortByActionOrder(targets)
+		for _, player in sgs.qlist(targets) do
+			room:cardEffect(self, source, player)
+		end
+
+		local kingdom_list = sgs.Sanguosha:getKingdoms()
+		table.insert(kingdom_list, "careerist")
+		local invoke = true
+		local n = source:getPlayerNumWithSameKingdom("xiongyi", nil, 0)
+		for _, kingdom in ipairs(kingdom_list) do
+			if kingdom == "god" then continue end
+			if source:getRole() == "careerist" then
+				if kingdom == "careerist" then continue end
+			elseif source:getKingdom() == kingdom then
+				continue
+			end
+			local other_num = source:getPlayerNumWithSameKingdom("LuaXiongyi", kingdom, 0)
+			if other_num > 0 and other_num < n then
+				invoke = false
+				break
+			end
+		end
+		if invoke and source:isWounded() then
+			local recover = sgs.RecoverStruct()
+			recover.who = source
+			room:recover(source, recover)
+		end
+	end,
+
+	on_effect = function(self, effect)
+		effect.to:drawCards(3)
+	end,
+}
+
+
+LuaXiongyiVS = sgs.CreateZeroCardViewAsSkill{
+	name = "LuaXiongyi",
+	enabled_at_play = function(self, player)
+		return player:getMark("@arise") >= 1
+	end,
+	view_as = function(self)
+		local card = LuaXiongyiCard:clone()
+        card:setShowSkill(self:objectName())
+		return card
+	end,
+}
+
+LuaXiongyi = sgs.CreateTriggerSkill{
+	name = "LuaXiongyi",
+	frequency = sgs.Skill_Limited,
+	limit_mark = "@arise",
+	view_as_skill = LuaXiongyiVS,
+}
+
 --[[
 	恂恂
 	相关武将：势-李典
