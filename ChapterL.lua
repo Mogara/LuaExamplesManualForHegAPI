@@ -152,6 +152,130 @@ LuaLijian = sgs.CreateOneCardViewAsSkill{
 	引用：
 	状态：
 ]]
+
+LuaLirang = sgs.CreateTriggerSkill{
+	name = "LuaLirang",
+	events = {sgs.CardsMoveOneTime},
+	frequency = sgs.Skill_Frequent,
+
+    can_trigger = function(self,event,room,player,data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local move = data:toMoveOneTime()
+		if not move.from or move.from:objectName() ~= player:objectName() then return false end
+        if bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
+			if move.to_place == sgs.Player_PlaceTable then
+				local i = 0
+				local lirang_card = sgs.VariantList()
+				for _, card_id in sgs.qlist(move.card_ids) do
+					if room:getCardPlace(card_id) == sgs.Player_PlaceTable and (move.from_places:at(i) == sgs.Player_PlaceHand or move.from_places:at(i) == sgs.Player_PlaceEquip) then
+						lirang_card:append(sgs.QVariant(card_id))
+					end
+                    i = i + 1
+				end
+				if not lirang_card:isEmpty() then
+                    player:setTag("lirang_to_judge", sgs.QVariant(lirang_card))
+				end
+			elseif move.from_places:contains(sgs.Player_PlaceTable) and move.to_place == sgs.Player_DiscardPile then
+				local lirang_card = player:getTag("lirang_to_judge"):toList()
+				player:removeTag("lirang_to_judge")
+				local lirangs = sgs.VariantList()
+				for _, id in sgs.qlist(lirang_card) do
+					if room:getCardPlace(id:toInt()) == sgs.Player_DiscardPile then
+						lirangs:append(id)
+					end
+				end
+				if lirangs:isEmpty() then return false end
+				player:setTag("lirang", sgs.QVariant(lirangs))
+				return self:objectName()
+			end
+		end
+	end,
+
+	on_cost = function(self,event,room,player,data)
+		if not player:hasShownSkill(self:objectName()) and not player:askForSkillInvoke(self:objectName()) then
+			player:removeTag("lirang")
+            return false
+		end
+		if not player:hasShownSkill(self:objectName()) then
+			player:setMark("lirang_notcancelable", 1)
+		end
+        return true
+	end,
+
+	on_effect = function(self,event,room,player,data)
+        local move = data:toMoveOneTime()
+        if move.from:objectName() ~= player:objectName() then return false end
+		if move.to_place == sgs.Player_DiscardPile and bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
+			local Qlirang_card = player:getTag("lirang"):toList()
+			player:removeTag("lirang")
+			local lirang_copy, lirang_card = sgs.IntList(), sgs.IntList()
+			for _, id in sgs.qlist(Qlirang_card) do
+				lirang_card:append(id:toInt())
+				if room:getCardPlace(id:toInt()) == sgs.Player_DiscardPile then
+					lirang_copy:append(id:toInt())
+				end
+			end
+
+			if lirang_card:isEmpty() then return false end
+
+			local preview_reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PREVIEW, player:objectName(), self:objectName(), "")
+			local lirang_preview = sgs.CardsMoveStruct(lirang_card, nil, player, sgs.Player_DiscardPile, sgs.Player_PlaceHand, preview_reason)
+			local lirang_preview_l = sgs.CardsMoveList()
+			lirang_preview_l:append(lirang_preview)
+			local _player = sgs.SPlayerList()
+			_player:append(player)
+
+			room:setPlayerFlag(player, "lirang_InTempMoving")
+			room:notifyMoveCards(true, lirang_preview_l, false, _player)
+			room:notifyMoveCards(false, lirang_preview_l, false, _player)
+			room:setPlayerFlag(player, "-lirang_InTempMoving")
+
+			local original_lirang = sgs.IntList()
+			for _, id in sgs.qlist(lirang_card) do
+				original_lirang:append(id)
+			end
+			local lirang_reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PREVIEWGIVE, player:objectName())
+			local lirang_cancelable = true
+			if player:getMark("lirang_notcancelable") > 0 then
+				player:setMark("lirang_notcancelable", 0)
+				lirang_cancelable = false
+			end
+			while room:askForYiji(player, lirang_card, self:objectName(), true, true, lirang_cancelable, -1,
+				sgs.SPlayerList(), lirang_reason, "@lirang-distribute", lirang_cancelable) do
+				lirang_cancelable = true
+				local ids = sgs.IntList()
+				for _, id in sgs.qlist(original_lirang) do
+					if room:getCardPlace(id) ~= sgs.Player_DiscardPile then
+						ids:append(id)
+						lirang_card:removeOne(id)
+					end
+				end
+				local lirang_give_preview = sgs.CardsMoveStruct(ids, player, nil, sgs.Player_PlaceHand, sgs.Player_PlaceTable, preview_reason)
+
+				local original_lirang = sgs.IntList()
+				for _, id in sgs.qlist(lirang_card) do
+					original_lirang:append(id)
+				end
+
+				local lirang_give_preview_l = sgs.CardsMoveList()
+				lirang_give_preview_l:append(lirang_give_preview)
+
+				room:notifyMoveCards(true, lirang_give_preview_l, false, _player)
+				room:notifyMoveCards(false, lirang_give_preview_l, false, _player)
+				if player:isDead() then break end
+			end
+
+			if not lirang_card:isEmpty() then
+				local lirang_return_preview = sgs.CardsMoveStruct(lirang_card, player, nil, sgs.Player_PlaceHand, sgs.Player_DiscardPile, preview_reason)
+				local lirang_return_preview_l = sgs.CardsMoveList()
+				lirang_return_preview_l:append(lirang_return_preview)
+				room:notifyMoveCards(true, lirang_return_preview_l, true, _player)
+				room:notifyMoveCards(false, lirang_return_preview_l, false, _player)
+			end
+		end
+	end,
+}
+
 --[[
 	连环
 	相关武将：标-庞统
