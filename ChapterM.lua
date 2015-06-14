@@ -64,3 +64,42 @@ LuaMengjin = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaMingshi = sgs.CreateTriggerSkill{
+	name = "LuaMingshi",
+	events = {sgs.DamageInflicted},
+	frequency = sgs.Skill_Compulsory,
+
+	can_trigger = function(self,event,room,player,data)
+		if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+		local damage = data:toDamage()
+		if damage.from and not damage.from:hasShownAllGenerals() then
+			return self:objectName()
+		end
+	end,
+	on_cost = function(self,event,room,player,data)
+		local invoke = player:hasShownSkill(self:objectName()) or player:askForSkillInvoke(self:objectName(), data)
+		if invoke then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
+	end,
+
+	on_effect = function(self,event,room,player,data)
+		local damage = data:toDamage()
+        room:notifySkillInvoked(player, self:objectName())
+
+		local log = sgs.LogMessage()
+		log.type = "#Mingshi"
+		log.from = player
+		log.arg = damage.damage
+		damage.damage = damage.damage - 1
+		log.arg2 = damage.damage
+		room:sendLog(log)
+
+		if damage.damage < 1 then
+			return true
+		end
+        data:setValue(damage)
+	end,
+}
