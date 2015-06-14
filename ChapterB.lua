@@ -50,6 +50,78 @@ LuaBazhen = sgs.CreateTriggerSkill{
 	状态：
 ]]
 
+LuaBeige = sgs.CreateTriggerSkill{
+	name = "LuaBeige",
+	events = {sgs.Damaged, sgs.FinishJudge},
+
+	can_trigger = function(self,event,room,player,data)
+		local skill_list,player_list = {},{}
+        if not player then return false end
+		if event == sgs.Damaged then
+			local damage = data:toDamage()
+			if not damage.card or not damage.card:isKindOf("Slash") or damage.to:isDead() then return false end
+
+			local caiwenjis = room:findPlayersBySkillName(self:objectName())
+			for _, caiwenji in sgs.qlist(caiwenjis) do
+				if caiwenji:canDiscard(caiwenji, "he") then
+					table.insert(skill_list, self:objectName())
+					table.insert(player_list, caiwenji:objectName())
+				end
+			end
+            return table.concat(skill_list, "|"), table.concat(player_list, "|")
+		else
+			local judge = data:toJudge()
+			if judge.reason == self:objectName() then
+				judge.pattern = tostring(judge.card:getSuit())
+			end
+		end
+	end,
+
+	on_cost = function(self,event,room,player,data,ask_who)
+		if player and player:isAlive() and ask_who:isAlive() and ask_who:canDiscard(ask_who, "he") then
+            ask_who:setTag("beige_data", data)
+			local invoke = room:askForDiscard(ask_who, self:objectName(), 1, 1, true, true, "@beige", true)
+            ask_who:removeTag("beige_data")
+
+			if invoke then
+                room:doAnimate(1, ask_who:objectName(), data:toDamage().to:objectName())
+				room:broadcastSkillInvoke(self:objectName(), ask_who)
+                return true
+			end
+		end
+	end,
+	on_effect = function(self,event,room,player,data,ask_who)
+		local damage = data:toDamage()
+
+		local judge = sgs.JudgeStruct()
+		judge.good = true
+		judge.play_animation = false
+		judge.who = player
+		judge.reason = self:objectName()
+
+		room:judge(judge)
+
+		local suit = tonumber(judge.pattern)
+		if suit == sgs.Card_Heart then
+			local recover = sgs.RecoverStruct()
+			recover.who = ask_who
+			room:recover(player, recover)
+
+		elseif suit == sgs.Card_Diamond then
+			player:drawCards(2)
+
+		elseif suit == sgs.Card_Club then
+			if damage.from and damage.from:isAlive() then
+				room:askForDiscard(damage.from, "beige_discard", 2, 2, false, true)
+			end
+		elseif suit == sgs.Card_Spade then
+			if damage.from and damage.from:isAlive() then
+				damage.from:turnOver()
+			end
+		end
+	end,
+}
+
 --[[
 	闭月
 	相关武将：标-貂蝉
