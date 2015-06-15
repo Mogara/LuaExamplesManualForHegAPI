@@ -330,3 +330,53 @@ LuaHuoshou = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaHuoshui = sgs.CreateTriggerSkill{
+	name = "LuaHuoshui",
+	events = {sgs.GeneralShown, sgs.GeneralHidden, sgs.GeneralRemoved, sgs.EventPhaseStart, sgs.Death, sgs.EventAcquireSkill, sgs.EventLoseSkill},
+	view_as_skill = LuaHuoshuiVS,
+
+	can_trigger = function(self,event,room,player,data)
+		local function doHuoshui(room, zoushi, set)
+			if set and not zoushi:getTag("huoshui"):toBool() then
+				for _, p in sgs.qlist(room:getOtherPlayers(zoushi)) do
+					room:setPlayerDisableShow(p, "hd", "LuaHuoshui")
+				end
+				zoushi:setTag("huoshui", sgs.QVariant(true))
+			elseif not set and zoushi:getTag("huoshui"):toBool() then
+				for _, p in sgs.qlist(room:getOtherPlayers(zoushi)) do
+					room:removePlayerDisableShow(p, "LuaHuoshui")
+				end
+				zoushi:setTag("huoshui", sgs.QVariant(false))
+			end
+		end
+		if not player then return false end
+		if event ~= sgs.Death and not player:isAlive() then return false end
+
+		local c = room:getCurrent()
+		if not c or (event ~= sgs.EventPhaseStart and c:getPhase() == sgs.Player_NotActive) or c:objectName() ~= player:objectName() then return false end
+
+		if ((event == sgs.GeneralShown or event == sgs.EventPhaseStart or event == sgs.EventAcquireSkill) and not player:hasShownSkill(self:objectName())) then return false end
+		if ((event == sgs.GeneralShown or event == sgs.GeneralHidden) and (not player:ownSkill(self:objectName()) or player:inHeadSkills(self:objectName()) ~= data:toBool())) then return false end
+		if event == sgs.GeneralRemoved then
+			local general = data:toString()
+			local ok
+			for _, sk in sgs.qlist(general:getSkillList()) do
+				if sk:objectName() == self:objectName() then
+					ok = true
+					break
+				end
+			end
+			if not ok then return false end
+		end
+		if (event == sgs.EventPhaseStart and not (player:getPhase() == sgs.Player_RoundStart or player:getPhase() == sgs.Player_NotActive)) then return false end
+		if (event == sgs.Death and (data:toDeath().who:objectName() ~= player:objectName() or not player:hasShownSkill(self:objectName()))) then return false end
+		if ((event == sgs.EventAcquireSkill or event == sgs.EventLoseSkill) and data:toString() ~= self:objectName()) then return false end
+
+		local set = false
+		if (event == sgs.GeneralShown or event == sgs.EventAcquireSkill or (event == sgs.EventPhaseStart and player:getPhase() == sgs.Player_RoundStart)) then
+			set = true
+		end
+		doHuoshui(room, player, set)
+	end,
+}
