@@ -114,6 +114,112 @@ LuaHaoshiGive = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaHeyiSummonCard = sgs.CreateArraySummonCard{
+	name = "LuaHeyi",
+    mute = true,
+}
+
+LuaHeyiVS = sgs.CreateArraySummonSkill{
+	name = "LuaHeyi",
+	array_summon_card = LuaHeyiSummonCard,
+}
+
+LuaHeyi = sgs.CreateTriggerSkill{
+	name = "LuaHeyi",
+	is_battle_array = true,
+	battle_array_type = sgs.Formation,
+	view_as_skill = LuaHeyiVS,
+	events = {sgs.GeneralShown, sgs.GeneralHidden, sgs.GeneralRemoved, sgs.Death, sgs.RemoveStateChanged},
+	can_preshow = false,
+
+	can_trigger = function(self,event,room,player,data)
+		if not player then return false end
+		if (event == sgs.Death) then
+			local death = data:toDeath()
+			if death.who:hasSkill(self:objectName()) then
+				for _, p in sgs.qlist(room:getAllPlayers()) do
+					if (p:getMark("LuaFeiying") > 0) then
+						room:setPlayerMark(p, "LuaFeiying", 0)
+						room:detachSkillFromPlayer(p, "LuaFeiying", true, true)
+					end
+				end
+				return false
+			end
+			if death.who:getMark("LuaFeiying") > 0 then
+				room:setPlayerMark(death.who, "LuaFeiying", 0)
+				room:detachSkillFromPlayer(death.who, "LuaFeiying", true, true)
+			end
+		end
+        for _, p in sgs.qlist(room:getAllPlayers()) do
+            if (p:getMark("LuaFeiying") > 0) then
+				room:setPlayerMark(p, "LuaFeiying", 0)
+				room:detachSkillFromPlayer(p, "LuaFeiying", true, true)
+			end
+		end
+		if room:alivePlayerCount() < 4 then return false end
+
+		local caohongs = room:findPlayersBySkillName(self:objectName())
+		for _, caohong in sgs.qlist(caohongs) do
+			if caohong:hasShownSkill(self:objectName()) then
+				for _, p in sgs.qlist(room:getOtherPlayers(caohong)) do
+					if caohong:inFormationRalation(p) then
+						room:setPlayerMark(p, "LuaFeiying", 1)
+                        room:attachSkillToPlayer(p, "LuaFeiying")
+					end
+				end
+			end
+		end
+	end,
+}
+
+LuaHeyiFeiying = sgs.CreateDistanceSkill{
+	name = "#LuaHeyi_feiying",
+
+	correct_func = function(self, from, to)
+		if to:getMark("LuaFeiying") > 0 then
+            return 1
+		else
+			return 0
+		end
+	end,
+}
+
+LuaHeyiEffect = sgs.CreateTriggerSkill{
+	name = "#LuaHeyi_effect",
+	events = {sgs.EventPhaseStart, sgs.GeneralShown},
+	frequency = sgs.Skill_Compulsory,
+	priority = 8,
+	can_preshow = false,
+
+	can_trigger = function(self,event,room,player,data)
+		if event == sgs.EventPhaseStart then
+			if player and player:isAlive() and player:getPhase() == sgs.Player_RoundStart then
+				local caohong = room:findPlayerBySkillName("LuaHeyi")
+				if caohong and caohong:isAlive() and caohong:hasShownSkill("LuaHeyi") and player:inFormationRalation(caohong) then
+					return self:objectName(), caohong
+				end
+			end
+		elseif event == sgs.GeneralShown then
+			if player and player:isAlive() and player:hasShownSkill("LuaHeyi") and data:toBool() == player:inHeadSkills("LuaHeyi") then
+                return self:objectName(), player
+			end
+		end
+	end,
+
+    on_cost = function(self,event,room,player,data,ask_who)
+		if ask_who:hasShownSkill("LuaHeyi") then
+			room:broadcastSkillInvoke("LuaHeyi", ask_who)
+		end
+	end,
+}
+
+LuaFeiying = sgs.CreateTriggerSkill{
+	name = "LuaFeiying",
+	frequency = sgs.Skill_Compulsory,
+	can_preshow = false,
+}
+
 --[[
 	横江
 	相关武将：势-臧霸
