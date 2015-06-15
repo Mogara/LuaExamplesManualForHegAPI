@@ -375,3 +375,92 @@ luaTuxi = sgs.CreatePhaseChangeSkill{
 	引用：
 	状态：
 ]]
+
+LuaTuntian = sgs.CreateTriggerSkill{
+	name = "LuaTuntian",
+	events = {sgs.CardsMoveOneTime},
+	frequency = sgs.Skill_Frequent,
+
+    can_trigger = function(self,event,room,player,data)
+		if not player or not player:hasSkill(self:objectName()) or player:isDead() or player:getPhase() ~= sgs.Player_NotActive then return false end
+		local move = data:toMoveOneTime()
+		if move.to and move.to:objectName() == player:objectName() and (move.to_place == sgs.Player_PlaceHand or move.to_place == sgs.Player_PlaceEquip) then return false end
+		if move.from and move.from:objectName() == player:objectName() and (move.from_places:contains(sgs.Player_PlaceHand) or move.from_places:contains(sgs.Player_PlaceEquip)) then
+			if room:getTag("judge"):toInt() > 0 then
+				player:addMark("tuntian_postpone")
+			else
+				return self:objectName(), player
+			end
+		end
+	end,
+
+	on_cost = function(self,event,room,p,data,player)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
+	end,
+
+	on_effect = function(self,event,room,p,data,player)
+		local judge = sgs.JudgeStruct()
+		judge.pattern = ".|heart"
+		judge.good = false
+		judge.reason = self:objectName()
+		judge.who = player
+		room:judge(judge)
+	end,
+}
+
+LuaTuntianPostpone = sgs.CreateTriggerSkill{
+	name = "#LuaTuntian-postpone",
+	events = {sgs.FinishJudge},
+	priority = -1,
+
+    can_trigger = function(self,event,room,player,data)
+		local skill_list,player_list = {},{}
+		local players = room:findPlayersBySkillName("LuaTuntian")
+		for _, p in sgs.qlist(players) do
+			local postponed = p:getMark("tuntian_postpone")
+			if postponed > 0 then
+				p:removeMark("tuntian_postpone")
+				table.insert(skill_list, "LuaTuntian")
+				table.insert(player_list, p:objectName())
+			end
+		end
+		return table.concat(skill_list, "|"), table.concat(player_list, "|")
+	end,
+}
+
+LuaTuntianGotoField = sgs.CreateTriggerSkill{
+	name = "#LuaTuntian-gotofield",
+	events = {sgs.FinishJudge},
+
+	can_trigger = function(self,event,room,player,data)
+		local judge = data:toJudge()
+		if judge.who and judge.who:isAlive() and judge.who:objectName() == player:objectName() and judge.who:hasSkill("LuaTuntian") then
+			if judge.reason == "LuaTuntian" and judge:isGood() and room:getCardPlace(judge.card:getEffectiveId()) == sgs.Player_PlaceJudge then
+				return self:objectName()
+			end
+		end
+	end,
+
+    on_cost = function(self,event,room,player,data)
+        return player:askForSkillInvoke("_tuntian", sgs.QVariant("gotofield"))
+	end,
+
+   on_effect = function(self,event,room,player,data)
+		local judge = data:toJudge()
+		player:addToPile("LuaField", judge.card)
+	end,
+}
+
+LuaTuntianDistance = sgs.CreateDistanceSkill{
+	name = "#LuaTuntian-dist",
+	correct_func = function(self, from)
+		if from:hasShownSkill("LuaTuntian") then
+			return - from:getPile("LuaField"):length()
+		else
+			return 0
+		end
+	end,
+}
