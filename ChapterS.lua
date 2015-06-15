@@ -483,6 +483,50 @@ LuaShuangxiongGet = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaSijian = sgs.CreateTriggerSkill{
+	name = "LuaSijian",
+	events = {sgs.CardsMoveOneTime},
+
+    can_trigger = function(self,event,room,player,data)
+		if not player or not player:hasSkill(self:objectName()) then return false end
+		local move = data:toMoveOneTime()
+		if move.from and move.from:objectName() == player:objectName() and move.from_places:contains(sgs.Player_PlaceHand) and move.is_last_handcard then
+			for _, p in sgs.qlist(room:getOtherPlayers(player)) do
+				if player:canDiscard(p, "he") then
+					return self:objectName()
+				end
+			end
+		end
+	end,
+
+	on_cost = function(self,event,room,player,data)
+		local targets = sgs.SPlayerList()
+        for _, p in sgs.qlist(room:getOtherPlayers(player)) do
+			if player:canDiscard(p, "he") then
+				targets:append(p)
+			end
+		end
+		local to = room:askForPlayerChosen(player, targets, self:objectName(), "sijian-invoke", true, true)
+		if (to) then
+			local d = sgs.QVariant()
+			d:setValue(to)
+			player:setTag("sijian_target", d)
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
+	end,
+
+	on_effect = function(self,event,room,player,data)
+		local to = player:getTag("sijian_target"):toPlayer()
+		player:removeTag("sijian_target")
+		if to and player:canDiscard(to, "he") then
+			local card_id = room:askForCardChosen(player, to, "he", self:objectName(), false, sgs.Card_MethodDiscard)
+			room:throwCard(card_id, to, player)
+		end
+	end,
+}
+
 --[[
 	随势
 	相关武将：标-田丰
@@ -490,3 +534,49 @@ LuaShuangxiongGet = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaSuishi = sgs.CreateTriggerSkill{
+	name = "LuaSuishi",
+	events = {sgs.Dying, sgs.Death},
+	frequency = sgs.Skill_Compulsory,
+
+    can_trigger = function(self,event,room,player,data)
+		if not player or not player:hasSkill(self:objectName()) then return false end
+		local target
+		if event == sgs.Dying then
+			local dying = data:toDying()
+			if dying.damage and dying.damage.from then
+				target = dying.damage.from
+			end
+			if dying.who:objectName() ~= player:objectName() and target and (target:isFriendWith(player) or player:willBeFriendWith(target)) then
+				return self:objectName()
+			end
+		else
+			local death = data:toDeath()
+			target = death.who
+			if target and (target:isFriendWith(player) or player:willBeFriendWith(target)) then
+				return self:objectName()
+			end
+		end
+	end,
+
+	on_cost = function(self,event,room,player,data)
+		if player:hasShownSkill(self:objectName()) or player:askForSkillInvoke(self:objectName(), event) then
+			if event == sgs.Dying then
+				room:broadcastSkillInvoke(self:objectName(), 1, player)
+			else
+				room:broadcastSkillInvoke(self:objectName(), 2, player)
+			end
+            return true
+		end
+	end,
+
+	on_effect = function(self,event,room,player,data)
+		room:sendCompulsoryTriggerLog(player, self:objectName(), true)
+		if event == sgs.Dying then
+			player:drawCards(1)
+        else
+			room:loseHp(player)
+		end
+	end,
+}
