@@ -44,6 +44,25 @@ LuaJijiu = sgs.CreateOneCardViewAsSkill{
 	引用：
 	状态：
 ]]
+
+LuaJixi = sgs.CreateOneCardViewAsSkill{
+	name = "LuaJixi",
+	relate_to_place = "head",
+	filter_pattern = ".|.|.|LuaField",
+	expand_pile = "LuaField",
+
+	enabled_at_play = function(self, player)
+		return not player:getPile("LuaField"):isEmpty()
+	end,
+	view_as = function(self, ocard)
+		local shun = sgs.Sanguosha:cloneCard("Snatch", ocard:getSuit(), ocard:getNumber())
+		shun:addSubcard(ocard)
+		shun:setSkillName(self:objectName())
+        shun:setShowSkill(self:objectName())
+		return shun
+	end,
+}
+
 --[[
 	激诏
 	相关武将：阵-君刘备
