@@ -164,6 +164,71 @@ LuaKurou = sgs.CreateViewAsSkill{
 	引用：
 	状态：
 ]]
+
+LuaKuangfu = sgs.CreateTriggerSkill{
+	name = "LuaKuangfu",
+	events = {sgs.Damage},
+	frequency = sgs.Skill_Frequent,
+
+	can_trigger = function(self,event,room,player,data)
+		if not player or not player:hasSkill(self:objectName()) then return false end
+		local damage = data:toDamage()
+		local target = damage.to
+		if damage.card and damage.card:isKindOf("Slash") and target:hasEquip() and not damage.chain and not damage.transfer and not damage.to:hasFlag("Global_DFDebut") then
+			local equiplist = {}
+			for i = 0, 4, 1 do
+				if not target:getEquip(i) then continue end
+				if player:canDiscard(target, target:getEquip(i):getEffectiveId()) or not player:getEquip(i) then
+					return self:objectName()
+				end
+			end
+		end
+	end,
+
+	on_cost = function(self,event,room,player,data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:doAnimate(1, player:objectName(), data:toDamage().to:objectName())
+			return true
+		end
+	end,
+
+	on_effect = function(self,event,room,player,data)
+		local damage = data:toDamage()
+		local target = damage.to
+
+        local equiplist = sgs.IntList()
+		for i = 0, 4, 1 do
+			if not target:getEquip(i) then continue end
+			if not player:canDiscard(target, target:getEquip(i):getEffectiveId()) and player:getEquip(i) then
+				equiplist:append(target:getEquip(i):getEffectiveId())
+			end
+		end
+		local card_id = room:askForCardChosen(player, target, "e", self:objectName(), false, sgs.Card_MethodNone, equiplist)
+
+		local choicelist = {}
+		if player:canDiscard(target, card_id) then
+			table.insert(choicelist, "throw")
+		end
+		for i = 0, 4, 1 do
+			if not target:getEquip(i) then continue end
+			if target:getEquip(i):getEffectiveId() == card_id and not player:getEquip(i) then
+				table.insert(choicelist, "move")
+				break
+			end
+		end
+
+		local choice = room:askForChoice(player, self:objectName(), table.concat(choicelist, "+"))
+
+		if choice == "move" then
+			room:broadcastSkillInvoke(self:objectName(), 2, player)
+			room:moveCardTo(sgs.Sanguosha:getCard(card_id), player, sgs.Player_PlaceEquip)
+		else
+			room:broadcastSkillInvoke(self:objectName(), 1, player)
+			room:throwCard(sgs.Sanguosha:getCard(card_id), target, player)
+		end
+	end,
+}
+
 --[[
 	狂骨
 	相关武将：标-魏延
