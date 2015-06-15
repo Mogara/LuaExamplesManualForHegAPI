@@ -176,3 +176,68 @@ LuaZhijian = sgs.CreateOneCardViewAsSkill{
 	引用：
 	状态：
 ]]
+
+LuaZiliangCard = sgs.CreateSkillCard{
+	name = "LuaZiliangCard",
+	target_fixed = true,
+	will_throw = false,
+	handling_method = sgs.Card_MethodNone,
+	on_use = function(self, room, source)
+		source:setTag("ziliang", sgs.QVariant(self:getSubcards():first()))
+	end,
+}
+
+LuaZiliangVS = sgs.CreateOneCardViewAsSkill{
+	name = "LuaZiliang",
+	response_pattern = "@@LuaZiliang",
+	filter_pattern = ".|.|.|LuaField",
+	expand_pile = "LuaField",
+
+	view_as = function(self, ocard)
+		local c = LuaZiliangCard:clone()
+		c:addSubcard(ocard)
+        c:setShowSkill(self:objectName())
+		return c
+	end,
+}
+
+LuaZiliang = sgs.CreateTriggerSkill{
+	name = "LuaZiliang",
+	events = {sgs.Damaged},
+	relate_to_place = "deputy",
+	view_as_skill = LuaZiliangVS,
+
+    can_trigger = function(self,event,room,player,data)
+		local skill_list,player_list = {},{}
+		local players = room:findPlayersBySkillName(self:objectName())
+		if not player or player:isDead() then return false end
+		for _, p in sgs.qlist(players) do
+			if not p:getPile("LuaField"):isEmpty() and p:isFriendWith(player) then
+				table.insert(skill_list, self:objectName())
+				table.insert(player_list, p:objectName())
+			end
+		end
+		return table.concat(skill_list, "|"), table.concat(player_list, "|")
+	end,
+
+    on_cost = function(self,event,room,p,data,player)
+        player:removeTag("ziliang")
+        player:setTag("ziliang_aidata", data)
+		return room:askForUseCard(player, "@@LuaZiliang", "@ziliang-give", -1, sgs.Card_MethodNone)
+	end,
+
+	on_effect = function(self,event,room,p,data,player)
+		local id = player:getTag("ziliang"):toInt()
+		if p:objectName() == player:objectName() then
+			local log = sgs.LogMessage()
+			log.type = "$MoveCard"
+			log.from = player
+			log.to:append(player)
+			log.card_str = id
+			room:sendLog(log)
+		else
+			room:doAnimate(1, player:objectName(), p:objectName())
+		end
+        room:obtainCard(p, id)
+	end,
+}
