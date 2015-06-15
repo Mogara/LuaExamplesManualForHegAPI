@@ -306,6 +306,75 @@ LuaShushen = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+LuaShuangren = sgs.CreatePhaseChangeSkill{
+	name = "LuaShuangren",
+
+    can_trigger = function(self,event,room,player,data)
+		if not player or not player:hasSkill(self:objectName()) then return false end
+		if player:getPhase() == sgs.Player_Play and not player:isKongcheng() then
+			local room = player:getRoom()
+			local can_invoke = false
+			for _, p in sgs.qlist(room:getOtherPlayers(player)) do
+				if not p:isKongcheng() then
+					can_invoke = true
+					break
+				end
+			end
+            return can_invoke and self:objectName()
+		end
+	end,
+
+	on_cost = function(self,event,room,player,data)
+		local targets = sgs.SPlayerList()
+        for _, p in sgs.qlist(room:getOtherPlayers(player)) do
+			if not p:isKongcheng() then
+				targets:append(p)
+			end
+		end
+
+		local victim = room:askForPlayerChosen(player, targets, "shuangren", "@shuangren", true, true)
+		if victim then
+			room:broadcastSkillInvoke(self:objectName(), 1, player)
+			local pd = player:pindianSelect(victim, self:objectName())
+			local d = sgs.QVariant()
+			d:setValue(pd)
+			player:setTag("shuangren_pd", d)
+            return true
+		end
+	end,
+
+	on_phasechange = function(self,player)
+		local pd = player:getTag("shuangren_pd"):toPindian()
+		player:removeTag("shuangren_pd")
+		if pd then
+			local target = pd.to
+			local success = player:pindian(pd)
+			pd = nil
+			local room = player:getRoom()
+			if success then
+                local targets = sgs.SPlayerList()
+				for _, p in sgs.qlist(room:getAlivePlayers()) do
+					if player:canSlash(p, nil, false) and (p:isFriendWith(target) or target:objectName() == p:objectName()) then
+						targets:append(p)
+					end
+				end
+				if (targets:isEmpty()) then return false end
+
+				local slasher = room:askForPlayerChosen(player, targets, "shuangren-slash", "@dummy-slash")
+				local slash = sgs.Sanguosha:cloneCard("Slash")
+				slash:setSkillName("_shuangren")
+				room:useCard(sgs.CardUseStruct(slash, player, slasher), false)
+			else
+				room:broadcastSkillInvoke(self:objectName(), 3, player)
+                return true
+			end
+		else
+            assert(false)
+		end
+	end,
+}
+
 --[[
 	双雄
 	相关武将：标-颜良&文丑
