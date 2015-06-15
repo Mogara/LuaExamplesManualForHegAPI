@@ -173,6 +173,48 @@ luaQiangxi = sgs.CreateViewAsSkill{
 	引用：
 	状态：
 ]]
+
+LuaQingchengCard = sgs.CreateSkillCard{
+	name = "LuaQingchengCard",
+    handling_method = sgs.Card_MethodDiscard,
+	filter = function(self, targets, to_select, Self)
+		if (to_select:isLord() or to_select:getGeneralName():match("sujiang")) and to_select:getGeneral2() and to_select:getGeneral2Name():match("sujiang") then return false end
+		return #targets == 0 and to_select:objectName() ~= Self:objectName() and to_select:hasShownAllGenerals()
+	end,
+	on_effect = function(self, effect)
+		local player,to = effect.from, effect.to
+		local room = player:getRoom()
+		local choices = {}
+		if not to:isLord() and not to:getGeneralName():match("sujiang") then
+			table.insert(choices, to:getGeneral():objectName())
+		end
+		if to:getGeneral2() and not to:getGeneral2Name():match("sujiang") then
+			table.insert(choices, to:getGeneral2():objectName())
+		end
+		if #choices == 0 then return end
+		local choice = choices[1]
+		if #choices == 2 then
+			choice = room:askForGeneral(player, table.concat(choices,"+"), "", true, "LuaQingcheng")
+		end
+		to:hideGeneral(choice == to:getGeneral():objectName())
+	end,
+}
+
+LuaQingcheng = sgs.CreateOneCardViewAsSkill{
+	name = "LuaQingcheng",
+	filter_pattern = "EquipCard!",
+
+	enabled_at_play = function(self, player)
+		return player:canDiscard(player, "he")
+	end,
+	view_as = function(self, ocard)
+		local card = LuaQingchengCard:clone()
+		card:addSubcard(ocard)
+		card:setShowSkill(self:objectName())
+		return card
+	end,
+}
+
 --[[
 	倾国
 	相关武将：标-甄姬
