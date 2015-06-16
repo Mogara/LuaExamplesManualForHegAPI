@@ -11,16 +11,6 @@
 	状态：
 ]]
 
-
-NiaoxiangSummonCard = sgs.CreateArraySummonCard{
-	name = "LuaNiaoxiang",
-}
-
-LuaNiaoxiangVS = sgs.CreateArraySummonSkill{
-	name = "LuaNiaoxiang",
-	array_summon_card = NiaoxiangSummonCard,
-}
-
 LuaNiaoxiang = sgs.CreateTriggerSkill{
 	name = "LuaNiaoxiang",
 	is_battle_array = true,
@@ -30,7 +20,6 @@ LuaNiaoxiang = sgs.CreateTriggerSkill{
 	can_preshow = false,
 
 	can_trigger = function(self,event,room,player,data)
-		local skill_list, player_list = {}, {}
 		local use = data:toCardUse()
 		local skill_owners = room:findPlayersBySkillName(self:objectName())
 		for _, skill_owner in sgs.qlist(skill_owners) do
@@ -48,13 +37,10 @@ LuaNiaoxiang = sgs.CreateTriggerSkill{
 						table.insert(targets, target:objectName())
 					end
 				end
-				if #targets > 0 then
-					table.insert(skill_list, self:objectName() .. "->" .. table.concat(targets, "+"))
-					table.insert(player_list, player:objectName())
-				end
+				if #targets > 0 then return self:objectName() .. "->" .. table.concat(targets, "+") end
 			end
 		end
-		return table.concat(skill_list, "|"), table.concat(player_list, "|")
+		
 	end,
 	on_cost = function(self,event,room,target,data,ask_who)
 		if ask_who:hasShownSkill(self:objectName()) then
@@ -64,7 +50,7 @@ LuaNiaoxiang = sgs.CreateTriggerSkill{
 	end,
 	on_effect = function(self,event,room,target,data,ask_who)
 		room:sendCompulsoryTriggerLog(ask_who, self:objectName(), true)
-        local use = data:toCardUse()
+		local use = data:toCardUse()
 		local x = use.to:indexOf(target)
 		local jink_list = ask_who:getTag("Jink_" .. use.card:toString()):toList()
 		if jink_list:at(x):toInt() == 1 then
