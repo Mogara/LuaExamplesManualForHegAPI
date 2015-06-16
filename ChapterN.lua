@@ -11,6 +11,15 @@
 	状态：
 ]]
 
+NiaoxiangSummonCard = sgs.CreateArraySummonCard{
+	name = "LuaNiaoxiang",
+}
+
+LuaNiaoxiangVS = sgs.CreateArraySummonSkill{
+	name = "LuaNiaoxiang",
+	array_summon_card = NiaoxiangSummonCard,
+}
+
 LuaNiaoxiang = sgs.CreateTriggerSkill{
 	name = "LuaNiaoxiang",
 	is_battle_array = true,
