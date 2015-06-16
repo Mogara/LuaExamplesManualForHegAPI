@@ -10,6 +10,70 @@
 	引用：
 	状态：
 ]]
+
+
+NiaoxiangSummonCard = sgs.CreateArraySummonCard{
+	name = "LuaNiaoxiang",
+}
+
+LuaNiaoxiangVS = sgs.CreateArraySummonSkill{
+	name = "LuaNiaoxiang",
+	array_summon_card = NiaoxiangSummonCard,
+}
+
+LuaNiaoxiang = sgs.CreateTriggerSkill{
+	name = "LuaNiaoxiang",
+	is_battle_array = true,
+	battle_array_type = sgs.Siege,
+	view_as_skill = LuaNiaoxiangVS,
+	events = {sgs.TargetChosen},
+	can_preshow = false,
+
+	can_trigger = function(self,event,room,player,data)
+		local skill_list, player_list = {}, {}
+		local use = data:toCardUse()
+		local skill_owners = room:findPlayersBySkillName(self:objectName())
+		for _, skill_owner in sgs.qlist(skill_owners) do
+			if skill_owner:isAlive() and skill_owner:hasShownSkill(self:objectName()) and use.card and use.card:isKindOf("Slash") then
+				local targets = {}
+				local target
+				for _, to in sgs.qlist(use.to) do
+					for _, p in sgs.qlist(room:getAllPlayers()) do
+						if p:objectName() == to:objectName() then
+							target = p
+							break
+						end
+					end
+					if player:inSiegeRelation(skill_owner, target) then
+						table.insert(targets, target:objectName())
+					end
+				end
+				if #targets > 0 then
+					table.insert(skill_list, self:objectName() .. "->" .. table.concat(targets, "+"))
+					table.insert(player_list, player:objectName())
+				end
+			end
+		end
+		return table.concat(skill_list, "|"), table.concat(player_list, "|")
+	end,
+	on_cost = function(self,event,room,target,data,ask_who)
+		if ask_who:hasShownSkill(self:objectName()) then
+			room:broadcastSkillInvoke(self:objectName(), ask_who)
+			return true
+		end
+	end,
+	on_effect = function(self,event,room,target,data,ask_who)
+		room:sendCompulsoryTriggerLog(ask_who, self:objectName(), true)
+        local use = data:toCardUse()
+		local x = use.to:indexOf(target)
+		local jink_list = ask_who:getTag("Jink_" .. use.card:toString()):toList()
+		if jink_list:at(x):toInt() == 1 then
+			jink_list:replace(x ,sgs.QVariant(2))
+		end
+		ask_who:setTag("Jink_" .. use.card:toString(), sgs.QVariant(jink_list))
+	end,
+}
+
 --[[
 	涅槃
 	相关武将：标-庞统
