@@ -92,6 +92,103 @@ LuaDimeng = sgs.CreateViewAsSkill{
 	状态：
 ]]
 
+LuaDuanchang = sgs.CreateTriggerSkill{
+	name = "LuaDuanchang",
+	events = {sgs.Death},
+	frequency = sgs.Skill_Compulsory,
+	can_preshow = false,
+
+	
+	can_trigger = function(self,event,room,player,data)
+		if not player or not player:hasSkill(self:objectName()) then return false end
+		local death = data:toDeath()
+		if death.who:objectName() == player:objectName() and death.damage and death.damage.from then
+			if not (death.damage.from:getGeneral():objectName():match("sujiang") and death.damage.from:getGeneral2():objectName():match("sujiang")) then
+				return self:objectName() .. "->" .. death.damage.from:objectName()
+			end
+		end
+	end,
+
+	on_cost = function(self,event,room,target,data,player)
+		room:broadcastSkillInvoke(self:objectName(), player)
+		return true
+	end,
+
+	on_effect = function(self,event,room,target,data,player)
+		room:notifySkillInvoked(player, self:objectName())
+		local choice = "head_general"
+		local d = sgs.QVariant()
+		d:setValue(target)
+		if player:getAI() then
+			local choices = {}
+			if not target:getGeneral():objectName():match("sujiang") then
+				table.insert(choices, "head_general")
+			end
+            if not target:getGeneral2():objectName():match("sujiang") then
+				table.insert(choices, "deputy_general")
+			end
+
+			choice = room:askForChoice(player, self:objectName(), table.concat(choices, "+"), d)
+		else
+			local generals = {}
+			if not target:getGeneral():objectName():match("sujiang") then
+				local g = target:getGeneral():objectName()
+				if g:match("anjiang") then
+                    g = g .. "_head"
+				end
+				table.insert(generals, g)
+			end
+            if not target:getGeneral2():objectName():match("sujiang") then
+                local g = target:getGeneral2():objectName()
+                if g:match("anjiang") then
+					g = g .. "_deputy"
+				end
+                table.insert(generals, g)
+			end
+
+			local general = generals[1]
+			if #generals == 2 then
+				general = room:askForGeneral(player, table.concat(generals, "+"), generals[1], true, self:objectName(), d)
+			end
+			if general == target:getGeneral():objectName() or general == "anjiang_head" then
+				choice = "head_general"
+            else
+				choice = "deputy_general"
+			end
+		end
+
+		local log = sgs.LogMessage()
+		if choice == "head_general" then
+			log.type = "#DuanchangLoseHeadSkills"
+		else
+			log.type = "#DuanchangLoseDeputySkills"
+		end
+		log.from = player
+		log.to:append(target)
+		log.arg = self:objectName()
+		room:sendLog(log)
+
+		local duanchangList = target:property("Duanchang"):toString():split(",")
+
+		if choice == "head_general" and not table.contains(duanchangList, "head") then
+			table.insert(duanchangList, "head")
+		elseif choice == "deputy_general" and not table.contains(duanchangList, "deputy") then
+			table.insert(duanchangList, "deputy")
+		end
+		room:setPlayerProperty(target, "Duanchang", sgs.QVariant(table.concat(duanchangList, ",")))
+		
+		local skills = choice == "head_general" and target:getActualGeneral1():getVisibleSkillList() or target:getActualGeneral2():getVisibleSkillList()
+		for _, sk in sgs.qlist(skills) do
+			if not sk:isAttachedLordSkill() then
+				room:detachSkillFromPlayer(target, sk:objectName(), not target:hasShownSkill(sk))
+			end
+		end
+		if target:isAlive() then
+            target:gainMark("@duanchang")
+		end
+	end,
+}
+
 --[[
 	断粮
 	相关武将：标-徐晃
