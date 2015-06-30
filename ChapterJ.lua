@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（J区）
 	技能索引：
-	激昂、急救、急袭、激诏、集智、奸雄、节命、结姻、酒诗、据守、巨象  
+	激昂、急救、急袭、激诏、集智、奸雄、节命、结姻、精策、酒诗、据守、巨象  
 ]]--
 --[[
 	激昂
@@ -252,9 +252,63 @@ LuaJieyin = sgs.CreateViewAsSkill{
 	end,
 }
 
+--[[
+	精策
+	相关武将：身份-郭淮
+	描述：出牌阶段结束时，若你于此回合内使用过的牌数不小于你的体力值，你可摸两张牌。  
+	引用：
+	状态：
+]]
+
+jingceGZ = sgs.CreateTriggerSkill{
+	name = "jingceGZ",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.EventPhaseEnd, sgs.PreCardUsed},
+
+	on_record = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return end
+		if event == sgs.PreCardUsed then
+			local card
+			if event == sgs.PreCardUsed or event == sgs.CardUsed then
+				card = data:toCardUse().card
+			elseif event == sgs.CardResponded then
+				local response = data:toCardResponse()
+				card = response.m_isUse and response.m_card
+			end
+			if card and card:getHandlingMethod() == sgs.Card_MethodUse and card:getTypeId() ~= sgs.Card_TypeSkill then
+				if player:getPhase() <= sgs.Player_Play then player:addMark(self:objectName()) end
+			end
+		elseif event == sgs.EventPhaseEnd and player:getPhase() == sgs.Player_Finish then
+			player:setMark(self:objectName(), 0)
+		end
+	end,
+	
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and event == sgs.EventPhaseEnd and player:getPhase() == sgs.Player_Play then
+			if player:getMark(self:objectName()) >= player:getHp() then
+				return self:objectName()
+			end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		player:drawCards(2, self:objectName())
+		return false 
+	end,
+}
 
 --[[
-	据守
+	酒诗
 	相关武将：身份-曹植
 	描述：每当你需要使用【酒】时，若你处于平置状态，你可以叠置，视为使用一张【酒】；若你因受到伤害而扣减体力前你处于叠置状态，此伤害结算结束后你可以叠置。  
 	引用：
