@@ -56,12 +56,38 @@ Luaganglie = sgs.CreateTriggerSkill{
 	状态：
 ]]
 
-LuaGuzhengRecord = sgs.CreateTriggerSkill{
-	name = "#Luaguzheng-record",
-	events = {sgs.CardsMoveOneTime},
-	frequency = sgs.Skill_Compulsory,
-	can_trigger = function(self,event,room,erzhang,data)
-		if not erzhang or not erzhang:isAlive() or not erzhang:hasSkill("LuaGuzheng") then return false end
+LuaGuzhengCard = sgs.CreateSkillCard{
+	name = "LuaGuzhengCard",
+	target_fixed = true,
+	will_throw = false,
+	handling_method = sgs.Card_MethodNone,
+	on_use = function(self,room,source)
+		source:setTag("guzheng_card", sgs.QVariant(self:getSubcards():first()))
+		source:setFlags("guzheng_invoke")
+	end,
+}
+
+LuaGuzhengVS = sgs.CreateOneCardViewAsSkill{
+	name = "LuaGuzheng",
+	response_pattern = "@@LuaGuzheng",
+	view_filter = function(self,to_select)
+		local l = sgs.Self:property("guzheng_toget"):toString():split("+")
+        return table.contains(l, tostring(to_select:getId()))
+	end,
+	view_as = function(self,originalCard)
+		local gz = LuaGuzhengCard:clone()
+		gz:addSubcard(originalCard)
+		return gz
+	end,
+}
+
+LuaGuzheng = sgs.CreateTriggerSkill{
+	name = "LuaGuzheng",
+	events = {sgs.EventPhaseEnd, sgs.CardsMoveOneTime},
+	view_as_skill = LuaGuzhengVS,
+
+	on_record = function(self, event, room, player, data)
+		if not erzhang or not erzhang:isAlive() or not erzhang:hasSkill("LuaGuzheng") or event ~= sgs.CardsMoveOneTime then return false end
 		local current = room:getCurrent()
 		local move = data:toMoveOneTime()
 		if erzhang:objectName() == current:objectName() then return false end
@@ -95,41 +121,11 @@ LuaGuzhengRecord = sgs.CreateTriggerSkill{
             erzhang:setTag("LuaGuzhengOther",sgs.QVariant(QguzhengOther))
 		end
 	end,
-}
 
-LuaGuzhengCard = sgs.CreateSkillCard{
-	name = "LuaGuzhengCard",
-	target_fixed = true,
-	will_throw = false,
-	handling_method = sgs.Card_MethodNone,
-	on_use = function(self,room,source)
-		source:setTag("guzheng_card", sgs.QVariant(self:getSubcards():first()))
-		source:setFlags("guzheng_invoke")
-	end,
-}
-
-LuaGuzhengVS = sgs.CreateOneCardViewAsSkill{
-	name = "LuaGuzheng",
-	response_pattern = "@@LuaGuzheng",
-	view_filter = function(self,to_select)
-		local l = sgs.Self:property("guzheng_toget"):toString():split("+")
-        return table.contains(l, tostring(to_select:getId()))
-	end,
-	view_as = function(self,originalCard)
-		local gz = LuaGuzhengCard:clone()
-		gz:addSubcard(originalCard)
-		return gz
-	end,
-}
-
-LuaGuzheng = sgs.CreateTriggerSkill{
-	name = "LuaGuzheng",
-	events = {sgs.EventPhaseEnd},
-	view_as_skill = LuaGuzhengVS,
 	can_trigger = function(self,event,room,player)
 		local skill_list = {}
 		local name_list = {}
-		if not player or player:getPhase() ~= sgs.Player_Discard then return false end
+		if not player or event ~= sgs.EventPhaseEnd or player:getPhase() ~= sgs.Player_Discard then return false end
 		local erzhangs = room:findPlayersBySkillName(self:objectName())
 
 		for _, erzhang in sgs.qlist(erzhangs) do
