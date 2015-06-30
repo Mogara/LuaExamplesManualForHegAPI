@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（L区）
 	技能索引：
-	雷击、离间、礼让、连环、烈弓、烈刃、流离、龙胆、乱击、乱武、洛神、裸衣          
+	雷击、离间、礼让、连环、烈弓、烈刃、流离、龙胆、乱击、乱武、洛神、裸衣 、落英         
 ]]--
 --[[
 	雷击
@@ -867,5 +867,113 @@ luaLuoyi = sgs.CreateTriggerSkill{
 		else
             room:setPlayerFlag(player, self:objectName())
 		end
+	end,
+}
+
+--[[
+	落英
+	相关武将：身份-曹植
+	描述：当其他角色的♣判定牌置入弃牌堆后，你可获得之；当其他角色的被弃置的牌置入弃牌堆后，你可获得其中至少一张♣牌  
+	引用：
+	状态：
+]]
+
+lualuoying = sgs.CreateTriggerSkill{
+	name = "lualuoying",
+	can_preshow = true,
+	events = sgs.CardsMoveOneTime,
+	view_as_skill = lualuoyingVS,
+	
+	on_record = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return end
+		if not player:hasSkill(self:objectName()) then player:removeTag("luoyingCards_strings") return end --多重插入结算中手抖把技能预亮又暗掉依照操作只能这样处理
+		local move = data:toMoveOneTime()
+		if move.from and move.from:objectName() ~= player:objectName() then
+			local card_ids, dis, jud = {}, (bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD), (move.reason.m_reason == sgs.CardMoveReason_S_REASON_JUDGEDONE)
+			for i = 0, move.card_ids:length()-1, 1 do
+				local card_id = move.card_ids:at(i)
+				if (sgs.Sanguosha:getCard(card_id):getSuit() == sgs.Card_Club)
+						and ((move.to_place == sgs.Player_DiscardPile and jud and move.from_places:at(i) == sgs.Player_PlaceJudge)
+						or (move.to_place == sgs.Player_PlaceTable and dis and room:getCardPlace(card_id) == sgs.Player_PlaceTable and (move.from_places:at(i) == sgs.Player_PlaceHand or move.from_places:at(i) == sgs.Player_PlaceEquip))) then
+					table.insert(card_ids, tostring(card_id))
+				end
+			end	
+			if #card_ids > 0 then
+				local luoyingCards_strings = player:getTag("luoyingCards_strings"):toString()
+				luoyingCards_strings = luoyingCards_strings.."|"..table.concat(card_ids, "+") --防止插入结算时覆盖掉前次的落英牌信息
+				player:setTag("luoyingCards_strings", sgs.QVariant(luoyingCards_strings))
+			end
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName())) then return "" end
+
+		local luoyingCards_strings = player:getTag("luoyingCards_strings"):toString()
+		if luoyingCards_strings == "" then return "" end
+		local move, luoying_table  = data:toMoveOneTime(), luoyingCards_strings:split("|")
+		if move.from and move.from:objectName() ~= player:objectName() then
+			local dis = (bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD)
+			local jud = (move.reason.m_reason == sgs.CardMoveReason_S_REASON_JUDGEDONE)
+			local luoyingCards_string, luoying_ids = luoying_table[#luoying_table], {}
+
+			if move.to_place == sgs.Player_DiscardPile and (jud or (dis and move.from_places:contains(sgs.Player_PlaceTable))) then	
+				for _, idstring in ipairs(luoyingCards_string:split("+")) do
+					if room:getCardPlace(tonumber(idstring)) == sgs.Player_DiscardPile then table.insert(luoying_ids, idstring) end
+				end
+				room:setPlayerProperty(player, "luoying_toget", sgs.QVariant(table.concat(luoying_ids, "+")))
+				if #luoying_ids > 0 then return self:objectName() end
+			end
+		end
+		return "" 
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local luoyingCards_strings = player:getTag("luoyingCards_strings"):toString():split("|")
+		table.remove(luoyingCards_strings)
+		player:setTag("luoyingCards_strings", sgs.QVariant(table.concat(luoyingCards_strings, "|")))
+
+		local luoyingCards = player:property("luoying_toget"):toString():split("+")
+		local cards = sgs.IntList()
+		for _, idstring in ipairs(luoyingCards) do 
+			cards:append(tonumber(idstring))
+		end
+
+		room:setPlayerFlag(player, "luoying_InTempMoving")
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_UNKNOWN, player:objectName())
+		local fake_move = sgs.CardsMoveStruct(cards, nil, player, sgs.Player_DiscardPile, sgs.Player_PlaceHand, reason)
+		local moves = sgs.CardsMoveList()
+		moves:append(fake_move)
+		local caozhi = sgs.SPlayerList()
+		caozhi:append(player)
+		room:notifyMoveCards(true, moves, true, caozhi)
+		room:notifyMoveCards(false, moves, true, caozhi)
+		local invoke = room:askForUseCard(player, "@@lualuoying", "@lualuoying", -1, sgs.Card_MethodNone)
+		local fake_move2 = sgs.CardsMoveStruct(cards, player, nil, sgs.Player_PlaceHand, sgs.Player_DiscardPile, reason)
+		local moves2 = sgs.CardsMoveList()
+		moves2:append(fake_move2)
+		room:notifyMoveCards(true, moves2, true, caozhi)
+		room:notifyMoveCards(false, moves2, true, caozhi)
+		room:setPlayerFlag(player, "-luoying_InTempMoving")
+
+		if invoke then return true end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local move = data:toMoveOneTime()
+		local dummy = sgs.Sanguosha:cloneCard("jink")
+		local luoyingGet = player:getTag("luoyingGet"):toString():split("+")
+		player:removeTag("luoyingGet")
+		for _, idstring in ipairs(luoyingGet) do
+			local id = tonumber(idstring)
+			dummy:addSubcard(id)
+			move.from_places:removeAt(move.card_ids:indexOf(id))
+			move.card_ids:removeOne(id)
+		end
+		data:setValue(move)
+		room:obtainCard(player, dummy)
+		dummy:deleteLater()
+		return false 
 	end,
 }
