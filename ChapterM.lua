@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（M区）
 	技能索引：
-	马术、猛进、名士
+	马术、猛进、秘计、名士
 ]]--
 --[[
 	马术
@@ -54,6 +54,54 @@ LuaMengjin = sgs.CreateTriggerSkill{
         local effect = data:toSlashEffect()
 		local to_throw = room:askForCardChosen(pangde, effect.to, "he", self:objectName(), false, sgs.Card_MethodDiscard)
 		room:throwCard(sgs.Sanguosha:getCard(to_throw), effect.to, pangde)
+	end,
+}
+
+--[[
+	秘计
+	相关武将：身份-王异
+	描述：结束阶段开始时，若你已受伤，你可摸一至X张牌（X为你已损失的体力值），然后将等量的手牌交给其他角色。     
+	引用：
+	状态：1.2.0 验证通过
+]]
+luamiji = sgs.CreateTriggerSkill{
+	name = "luamiji",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.EventPhaseStart, sgs.ChoiceMade},
+	
+	on_record = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and event == sgs.ChoiceMade then
+			local str = data:toString()
+			if str:startsWith("Yiji:") then
+				player:addMark(self:objectName(), #table.remove(str:split(":")):split("+"))
+			end
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and event == sgs.EventPhaseStart then
+			if player:getPhase() == sgs.Player_Finish and player:isWounded() then return self:objectName() end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		player:setMark(self:objectName(), 0)
+		local x = player:getLostHp()
+		player:drawCards(x, self:objectName())
+		while player:isAlive() and not player:isKongcheng() and x > player:getMark(self:objectName()) do
+			room:askForYiji(player, player:handCards(), self:objectName(), false, false, false, x - player:getMark(self:objectName()), room:getOtherPlayers(player))
+		end
+		return false 
 	end,
 }
 
