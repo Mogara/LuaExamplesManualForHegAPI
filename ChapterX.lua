@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（X区）
 	技能索引：
-	享乐、骁果、枭姬、行殇、雄异、恂恂
+	享乐、骁果、枭姬、行殇、雄异、眩惑、恂恂
 ]]--
 --[[
 	享乐
@@ -232,6 +232,84 @@ LuaXiongyi = sgs.CreateTriggerSkill{
 	frequency = sgs.Skill_Limited,
 	limit_mark = "@arise",
 	view_as_skill = LuaXiongyiVS,
+}
+
+--[[
+	眩惑
+	相关武将：身份-法正
+	描述：摸牌阶段，你可以放弃摸牌，改为令一名其他角色摸两张牌，然后该角色需对其攻击范围内，由你指定的另一名角色使用一张【杀】，否则你获得其两张牌。 
+	引用：
+	状态：1.2.0 验证通过
+]]
+
+luaxuanhuo = sgs.CreateTriggerSkill{
+	name = "luaxuanhuo",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.EventPhaseStart,
+	
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Draw then
+			if true then return self:objectName() end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local target = room:askForPlayerChosen(player, room:getOtherPlayers(player), self:objectName(), self:objectName().."-invoke", true, true)
+		if target then
+			local target_data = sgs.QVariant()
+			target_data:setValue(target)
+			player:setTag(self:objectName(), target_data)
+			room:broadcastSkillInvoke(self:objectName(), 1, player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local target = player:getTag(self:objectName()):toPlayer()
+		player:removeTag(self:objectName())
+		target:drawCards(2, self:objectName())
+
+		if player:isAlive() and target:isAlive() then
+			local victims, victim = sgs.SPlayerList()
+			for _, p in sgs.qlist(room:getOtherPlayers(target)) do
+				if target:canSlash(p) then victims:append(p) end
+			end
+			if not victims:isEmpty() then
+				victim = room:askForPlayerChosen(player, victims, self:objectName().."_slash", "@"..self:objectName().."-slash2:"..target:objectName())
+				local log = sgs.LogMessage()
+				log.type = "#CollateralSlash";
+				log.from = player
+				log.to:append(victim)
+				room:sendLog(log)
+			end
+
+			if not victim or not room:askForUseSlashTo(target, victim, self:objectName().."-slash::"..victim:objectName()) then		
+				room:broadcastSkillInvoke(self:objectName(), 2, player)
+				if not target:isNude() then
+					local dummy = sgs.Sanguosha:cloneCard("jink")
+
+					room:setPlayerFlag(target, "Global_InTempMoving")
+					local first_id = room:askForCardChosen(player, target, "he", self:objectName())
+					local original_place = room:getCardPlace(first_id)
+					dummy:addSubcard(first_id)
+					target:addToPile("#"..self:objectName(), dummy, false)
+					if not target:isNude() then
+						local second_id = room:askForCardChosen(player, target, "he", self:objectName())
+						dummy:addSubcard(second_id)
+					end
+					room:moveCardTo(sgs.Sanguosha:getCard(first_id), target, original_place, false)
+					room:setPlayerFlag(target, "-Global_InTempMoving")
+
+					player:obtainCard(dummy, false)
+					dummy:deleteLater()
+				end
+			end
+		end
+		return true
+	end,
 }
 
 --[[
