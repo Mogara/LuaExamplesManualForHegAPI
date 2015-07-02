@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（Z区）
 	技能索引：
-	再起、章武、鸩毒、制衡、直谏、资粮  
+	再起、章武、鸩毒、贞烈、制衡、直谏、资粮  
 ]]--
 --[[
 	再起
@@ -84,6 +84,54 @@ LuaZaiqi = sgs.CreatePhaseChangeSkill{
 	引用：
 	状态：
 ]]
+
+--[[
+	贞烈
+	相关武将：身份-王异
+	描述：当你成为其他角色使用【杀】或非延时类锦囊牌的目标后，你可失去1点体力，令此牌对你无效，然后你弃置其一张牌。 
+	引用：
+	状态：1.2.0 验证通过
+]]
+
+luazhenlie = sgs.CreateTriggerSkill{
+	name = "luazhenlie",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.TargetConfirmed,
+
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and player:getHp() > 0 then
+			local use = data:toCardUse()
+			if use.from and use.from:objectName() ~= player:objectName() and use.to:contains(player) then
+				if use.card:isKindOf("Slash") or use.card:isNDTrick() then return self:objectName() end
+			end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			room:loseHp(player)
+			if player:isAlive() then return true end
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local use = data:toCardUse()
+		local nullified_list = use.nullified_list
+		table.insert(nullified_list, player:objectName())
+		use.nullified_list = nullified_list
+		data:setValue(use)
+		if player:canDiscard(use.from, "he") then
+			local id = room:askForCardChosen(player, use.from, "he", self:objectName(), false, sgs.Card_MethodDiscard)
+			room:throwCard(id, use.from, player)
+		end
+		return false 
+	end,
+}
+
 --[[
 	制衡
 	相关武将：标-孙权
