@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（S区）
 	技能索引：
-	尚义、神速、神智、生息、守成、授钺、淑慎、双刃、双雄、死谏、随势  
+	尚义、神速、慎行、神智、生息、守成、授钺、淑慎、双刃、双雄、死谏、随势  
 ]]--
 --[[
 	尚义
@@ -155,6 +155,50 @@ luaShensuSlash = sgs.CreateTargetModSkill{
 			return 0
 		end
 	end,
+}
+
+--[[
+	慎行
+	相关武将：身份-顾雍
+	描述：出牌阶段，你可以弃置两张牌，摸一张牌。
+	引用：
+	状态：1.2.0 验证通过
+]]
+
+luashenxingCard = sgs.CreateSkillCard{
+	name = "luashenxingCard",
+	skill_name = "luashenxing",
+	target_fixed = true,
+	will_throw = true,
+
+	on_use = function(self, room, source, targets)
+		room:drawCards(source, 1, "luashenxing")
+	end,
+}
+
+luashenxing = sgs.CreateViewAsSkill{
+	name = "luashenxing", 
+	n = 2,
+
+	view_filter = function(self, selected, to_select)
+		return true
+	end,
+
+	view_as = function(self, originalCards) 
+		if #originalCards == 2 then
+			local skillcard = luashenxingCard:clone()
+			for _, card in ipairs(originalCards) do
+				skillcard:addSubcard(card)
+			end
+			skillcard:setSkillName(self:objectName())
+			skillcard:setShowSkill(self:objectName())
+			return skillcard
+		end
+	end, 
+
+	enabled_at_play = function(self, player)
+		return player:getCardCount(true) >= 2 and player:canDiscard(player, "he")
+	end, 
 }
 
 --[[
