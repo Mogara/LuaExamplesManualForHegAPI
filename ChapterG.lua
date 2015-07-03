@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（G区）
 	技能索引：
-	刚烈、固政、观星、闺秀、鬼才、鬼道、国色   
+	刚烈、固政、观星、闺秀、鬼才、鬼才·界限、鬼道、国色   
 ]]--
 --[[
 	刚烈
@@ -409,6 +409,44 @@ LuaGuicai = sgs.CreateTriggerSkill{
 	on_effect = function(self, event, room, player, data)
 		local judge = data:toJudge()
 		judge:updateResult()
+		return false
+	end,
+}
+
+--[[
+	鬼才·界限
+	相关武将：身份-司马懿·界限突破
+	描述：每当一名角色的判定牌生效前，你可以打出一张牌代替之。 
+	引用：
+	状态：1.2.0 验证通过
+]]
+
+LuaGuicaiJx = sgs.CreateTriggerSkill{
+	name = "LuaGuicaiJx",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.AskForRetrial,
+	
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName())) or (player:isNude() and player:getHandPile():isEmpty()) then return "" end
+		return self:objectName()
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local judge = data:toJudge()
+		local prompt_list = {"@"..self:objectName().."-card" , judge.who:objectName(), self:objectName(), judge.reason, string.format("%d", judge.card:getEffectiveId())}
+		local prompt = table.concat(prompt_list, ":")
+		local card = room:askForCard(player, "..", prompt, data, sgs.Card_MethodResponse, judge.who, true)
+		if card then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			room:retrial(card, player, judge, self:objectName())
+			return true
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		data:toJudge():updateResult()
 		return false
 	end,
 }
