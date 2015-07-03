@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（J区）
 	技能索引：
-	激昂、急救、急袭、激诏、集智、奸雄、节命、结姻、精策、酒诗、据守、巨象  
+	激昂、急救、急袭、激诏、集智、奸雄、奸雄·界限、节命、结姻、精策、酒诗、据守、巨象  
 ]]--
 --[[
 	激昂
@@ -136,6 +136,67 @@ Luajianxiong = sgs.CreateTriggerSkill{
 		room:broadcastSkillInvoke(self:objectName())
 		room:notifySkillInvoked(player, self:objectName())
 		player:obtainCard(card)
+	end,
+}
+
+--[[
+	奸雄
+	相关武将：身份-曹操·界限突破
+	描述：每当你受到伤害后，你可以选择一项：获得对你造成伤害的牌，或摸一张牌。   
+	引用：
+	状态：1.2.0 验证通过
+]]
+
+LuaJianxiongJx = sgs.CreateTriggerSkill{
+	name = "LuaJianxiongJx",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.Damaged,
+	
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName())) then return "" end
+		return self:objectName()
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local damage = data:toDamage()
+		local choices = {"draw"}
+
+		local card = damage.card
+		if card then
+			local ids = sgs.IntList()
+			if card:isVirtualCard() then
+				ids = card:getSubcards()
+			else
+				ids:append(card:getEffectiveId())
+			end
+			if ids:length() > 0 then
+				local all_place_table = true
+				for _,id in sgs.qlist(ids) do
+					if room:getCardPlace(id) ~= sgs.Player_PlaceTable then
+						all_place_table = false
+						break
+					end
+				end
+				if all_place_table then table.insert(choices, "obtain") end
+			end
+		end
+
+		local choice = room:askForChoice(player, self:objectName(), table.concat(choices, "+"), data)
+		if choice == "obtain" then
+			player:obtainCard(card)
+		else
+			player:drawCards(1, self:objectName())
+		end
+		return false 
 	end,
 }
 
