@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（Z区）
 	技能索引：
-	再起、章武、鸩毒、贞烈、制衡、直谏、直言、资粮  
+	再起、章武、鸩毒、贞烈、制衡、直谏、资粮  
 ]]--
 --[[
 	再起
@@ -215,57 +215,6 @@ LuaZhijian = sgs.CreateOneCardViewAsSkill{
 		zhijian_card:setShowSkill(self:objectName())
 		return zhijian_card
 	end
-}
-
---[[
-	直言
-	相关武将：身份-虞翻
-	描述：结束阶段开始时，你可以令一名角色摸一张牌，然后展示之，若此牌为装备牌，该角色先回复1点体力再使用此牌。
-	引用：
-	状态：1.2.0 验证通过
-]]
-
-luazhiyan = sgs.CreateTriggerSkill{
-	name = "luazhiyan",
-	can_preshow = true,
-	frequency = sgs.Skill_Frequent,
-	events = sgs.EventPhaseStart,
-	
-	can_trigger = function(self, event, room, player, data)
-		if not (player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Finish) then return "" end
-		return self:objectName()
-	end,
-	
-	on_cost = function(self, event, room, player, data)
-		local to = room:askForPlayerChosen(player, room:getAlivePlayers(), self:objectName(), self:objectName().."-invoke", true, true)
-		if to then
-			room:broadcastSkillInvoke(self:objectName(), player)
-			local to_data = sgs.QVariant()
-			to_data:setValue(to)
-			player:setTag(self:objectName(), to_data)
-			return true 
-		end
-		return false 
-	end,
-	
-	on_effect = function(self, event, room, player, data)
-		local to = player:getTag(self:objectName()):toPlayer()
-		player:removeTag(self:objectName())
-		local ids = room:getNCards(1, false)
-		local card = sgs.Sanguosha:getCard(ids:first())
-		room:obtainCard(to, card, false)
-		if to:isAlive() then
-			room:showCard(to, ids:first())
-			if not card:isKindOf("EquipCard") then return false end
-			local recover = sgs.RecoverStruct()
-			recover.who = player
-			room:recover(to, recover)
-			if to:isAlive() and room:getCardOwner(ids:first()):objectName() == to:objectName() and not to:isLocked(card) then
-				room:useCard(sgs.CardUseStruct(card, to, to))
-			end
-		end
-		return false 
-	end,
 }
 
 --[[
