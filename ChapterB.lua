@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（B区）
 	技能索引：
-	八阵、暴凌、悲歌、闭月、秉一、不屈
+	八阵、暴凌、悲歌、笔伐、闭月、秉一、不屈、补益
 ]]--
 --[[
 	八阵
@@ -27,6 +27,7 @@ LuaBazhen = sgs.CreateTriggerSkill{
 			return "EightDiagram"
 		end
 	end,
+	
     on_cost = function(self, event, room, player, data)
 		return false
 	end,
@@ -119,6 +120,103 @@ LuaBeige = sgs.CreateTriggerSkill{
 				damage.from:turnOver()
 			end
 		end
+	end,
+}
+--[[
+	笔伐
+	相关武将：身份-陈琳
+	描述：结束阶段开始时，你可以将一张手牌背面朝上置于一名其他角色的武将牌旁，若如此做，该角色的回合开始时，其观看其武将牌旁的牌，然后选择一项：1.将一张与此牌类别相同的手牌交给你，获得此牌；2.将此牌置入弃牌堆，失去1点体力
+	引用：
+	状态：1.2.1验证通过
+]]
+
+LuaBifaCard = sgs.CreateSkillCard{
+	name = "LuaBifaCard",
+	skill_name = "LuaBifa",
+	target_fixed = false,
+	will_throw = false,
+	handling_method = sgs.Card_MethodNone,
+
+	filter = function(self, targets, to_select, player)
+		return #targets == 0 and to_select:objectName() ~= player:objectName() and to_select:getPile(self:getSkillName()):isEmpty()
+	end,
+	
+	feasible = function(self, targets)
+		return #targets == 1
+	end,
+
+	on_use = function(self, room, source, targets)
+		targets[1]:addToPile(self:getSkillName(), self:getSubcards():first(), false)
+		local data = sgs.QVariant()
+		data:setValue(source)
+		targets[1]:setTag(self:getSkillName()..self:getEffectiveId(), data)
+	end,
+}
+
+LuaBifaVS = sgs.CreateOneCardViewAsSkill{   
+	name = "LuaBifa",
+	response_pattern = "@@LuaBifa",
+	filter_pattern = ".|.|.|hand",
+	
+	view_as = function(self, originalCard)
+		local skillcard = LuaBifaCard:clone()
+		skillcard:addSubcard(originalCard)
+		skillcard:setSkillName(self:objectName())
+		skillcard:setShowSkill(self:objectName())
+		return skillcard
+	end,
+}
+
+LuaBifa = sgs.CreateTriggerSkill{
+	name = "LuaBifa",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.EventPhaseStart,
+	view_as_skill = LuaBifaVS,
+	
+	on_record = function(self, event, room, player, data)
+		if player and player:isAlive() and not player:getPile(self:objectName()):isEmpty() and player:getPhase() == sgs.Player_RoundStart then
+			room:fillAG(player:getPile(self:objectName()), player)
+			local bifa_id = player:getPile(self:objectName()):first()
+			local chenlin = player:getTag(self:objectName()..bifa_id):toPlayer()
+			local bifa_card, pattern, card = sgs.Sanguosha:getCard(bifa_id)
+			if bifa_card:isKindOf("BasicCard") then
+				pattern = "BasicCard"
+			elseif bifa_card:isKindOf("TrickCard") then
+				pattern = "TrickCard"
+			elseif bifa_card:isKindOf("EquipCard") then
+				pattern = "EquipCard"
+			end
+			if chenlin and chenlin:isAlive() and not player:isKongcheng() then
+				card = room:askForCard(player, pattern, "@"..self:objectName(), data, sgs.Card_MethodNone, chenlin)
+			end
+			room:clearAG(player)
+			if card then
+				local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_GIVE, player:objectName(), chenlin:objectName(), self:objectName(), "")
+				room:moveCardTo(card, player, chenlin, sgs.Player_PlaceHand, reason, false)
+				reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_EXCHANGE_FROM_PILE, player:objectName(), self:objectName(), "")
+				room:moveCardTo(bifa_card, nil, player, sgs.Player_PlaceHand, reason, false)	
+			else
+				local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_REMOVE_FROM_PILE, "", self:objectName(), "")
+				room:throwCard(bifa_card, reason, nil)
+				room:loseHp(player)
+			end
+			player:removeTag(self:objectName()..bifa_id)
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Finish then
+			if not player:isKongcheng() then return self:objectName() end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if room:askForUseCard(player, "@@"..self:objectName(), self:objectName().."-SkillCard", -1, sgs.Card_MethodNone) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+		end
+		return false 
 	end,
 }
 
@@ -427,5 +525,58 @@ LuaBuquClear = sgs.CreateTriggerSkill{
 				room:enterDying(zhoutai, nil)
 			end
 		end
+	end,
+}
+
+--[[
+	补益
+	相关武将：身份-吴国太
+	描述：当一名角色进入濒死状态时，你可展示其一张手牌，然后 若此牌不为基本牌：其弃置之，回复1点体力。 
+	引用：
+	状态：1.2.1验证通过
+]]
+
+LuaBuyi = sgs.CreateTriggerSkill{
+	name = "LuaBuyi",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.Dying,
+
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) then
+			local dying = data:toDying()
+			if dying.who:getHp() < 1 and not dying.who:isKongcheng() then 
+				return self:objectName() 
+			end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local dying, card = data:toDying()
+		if player:objectName() == dying.who:objectName() then
+			card = room:askForCardShow(dying.who, player, self:objectName())
+		else
+			local id = room:askForCardChosen(player, dying.who, "h", self:objectName())
+			card = sgs.Sanguosha:getCard(id)
+		end
+		room:showCard(dying.who, card:getEffectiveId())
+		if card:getTypeId() ~= sgs.Card_TypeBasic then
+			if not dying.who:isJilei(card) then
+				room:throwCard(card, dying.who)
+			end
+			local recover = sgs.RecoverStruct()
+			recover.who = player
+			room:recover(dying.who, recover)
+		end
+		return false 
 	end,
 }
