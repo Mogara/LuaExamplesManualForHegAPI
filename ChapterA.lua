@@ -138,7 +138,7 @@ local LuaAocaiView = function(self, room, player, pattern)
 		table.insert(enablepattern, string.upper(string.sub(pat, 1, 1))..string.sub(pat, 2))
 	end
 
-	local ids2 = room:notifyChooseCards(player, ids, self:getSkillName(), sgs.Player_DrawPile, sgs.Player_PlaceTable, ids:length(), 0, "@"..self:getSkillName(), table.concat(enablepattern, ",").."|.|.|#"..self:getSkillName())
+	local ids2 = room:notifyChooseCards(player, ids, self:getSkillName(), sgs.Player_DrawPile, sgs.Player_PlaceTable, 1, 0, "@"..self:getSkillName(), table.concat(enablepattern, ",").."|.|.|#"..self:getSkillName())
 	local log, card = sgs.LogMessage()
 	if ids2:length() == 1 then 
 		card = sgs.Sanguosha:getCard(ids2:first())
