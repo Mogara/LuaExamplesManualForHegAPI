@@ -115,75 +115,57 @@ LuaAnxu = sgs.CreateZeroCardViewAsSkill{
 	备注：修改成类似OL的操作方式
 ]]
 
-local luaaocaiView = function(self, room, player, pattern)
+local LuaAocaiView = function(self, room, player, pattern)
 	local json = require ("json")
-	local ids = room:getNCards(2, false)
+	local enablepattern, ids = {}, sgs.IntList()
+	for i = 0, 1 do ids:append(room:getDrawPile():at(i)) end
 
 	room:doBroadcastNotify(sgs.CommandType.S_COMMAND_INVOKE_SKILL, json.encode({self:getSkillName(), player:objectName()}))
 	room:notifySkillInvoked(player, self:getSkillName())
 	room:broadcastSkillInvoke(self:getSkillName(), player)
 
-	if player:ownSkill(self:showSkill()) and not player:hasShownSkill(self:showSkill()) then --亮将
+	if player:ownSkill(self:showSkill()) and not player:hasShownSkill(self:showSkill()) then
 		player:showGeneral(player:inHeadSkills(self:showSkill()))
 	end
 
-	local jsonLog = {"$ViewDrawPile", player:objectName(), "", table.concat(sgs.QList2Table(ids),"+"), "", "" }
-	room:doNotify(player,sgs.CommandType.S_COMMAND_LOG_SKILL, json.encode(jsonLog))
+	local log2 = sgs.LogMessage()
+	log2.type = "$ViewDrawPile"
+	log2.from = player
+	log2.card_str = table.concat(sgs.QList2Table(ids), "+")
+	room:doNotify(player,sgs.CommandType.S_COMMAND_LOG_SKILL, log2:toVariant())
 
-	local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PREVIEW, player:objectName(), self:getSkillName(), "")
-	local move, move2 = sgs.CardsMoveStruct(ids, nil, player, sgs.Player_PlaceTable, sgs.Player_PlaceHand, reason), sgs.CardsMoveStruct(ids, player, nil, sgs.Player_PlaceHand, sgs.Player_PlaceTable, reason)
-	local moves, moves2 = sgs.CardsMoveList(), sgs.CardsMoveList()
-	moves:append(move)
-	moves2:append(move2)
-	local zhugeke = sgs.SPlayerList()
-	zhugeke:append(player)
-	room:notifyMoveCards(true, moves, true, zhugeke)
-	room:notifyMoveCards(false, moves, true, zhugeke)
-
-	local enablepattern = {}
-	for i = 1, 0, -1 do
-		for _, pat in ipairs(pattern:split("+")) do
-			if string.find(sgs.Sanguosha:getCard(ids:at(i)):objectName(), pat) then table.insert(enablepattern, ids:at(i)) end
-		end
+	for _, pat in ipairs(pattern:split("+")) do
+		table.insert(enablepattern, string.upper(string.sub(pat, 1, 1))..string.sub(pat, 2))
 	end
 
-	local log, askids, card = sgs.LogMessage(), table.concat(enablepattern, ",")
-	askids = askids == "" and "none" or askids
-	card = room:askForCard(player, askids, self:getSkillName(), sgs.QVariant(), sgs.Card_MethodNone)
-	room:setPlayerFlag(player, "Global_luaaocaiFailed")
-
-	room:notifyMoveCards(true, moves2, true, zhugeke)
-	room:notifyMoveCards(false, moves2, true, zhugeke)
-	for i = 1, 0, -1 do
-		room:setCardMapping(ids:at(i), nil, sgs.Player_DrawPile)
-		room:getDrawPile():prepend(ids:at(i))
-	end
-	room:doBroadcastNotify(sgs.CommandType.S_COMMAND_UPDATE_PILE, sgs.QVariant(room:getDrawPile():length()))
-
-	if card then
-		log.type = "$AluaaocaiUse"
+	local ids2 = room:notifyChooseCards(player, ids, self:getSkillName(), sgs.Player_DrawPile, sgs.Player_PlaceTable, ids:length(), 0, "@"..self:getSkillName(), table.concat(enablepattern, ",").."|.|.|#"..self:getSkillName())
+	local log, card = sgs.LogMessage()
+	if ids2:length() == 1 then 
+		card = sgs.Sanguosha:getCard(ids2:first())
+		log.type = "$LuaAocaiUse"
 		log.from = player
 		log.arg = self:getSkillName()
 		log.arg2 = ids:at(0) == card:getEffectiveId() and 1 or 2
 		log.card_str = card:getEffectiveId()
 		card:setSkillName(self:getSkillName())
 	end
+	room:setPlayerFlag(player, "Global_LuaAocaiFailed")
 	return card, log
 end
 
-luaaocaiCard = sgs.CreateSkillCard{
-	name = "luaaocaiCard",
-	skill_name = "luaaocai",
+LuaAocaiCard = sgs.CreateSkillCard{
+	name = "LuaAocaiCard",
+	skill_name = "LuaAocai",
 	target_fixed = false,
 	will_throw = false,
 	handling_method = sgs.Card_MethodNone,
 
-	filter = function(self, targets, to_select)
+	filter = function(self, targets, to_select, player)
 		local targetlist = sgs.PlayerList()
 		for i = 1, #targets do targetlist:append(targets[i]) end
 		local card = sgs.Sanguosha:cloneCard(self:getUserString())
 		card:deleteLater()
-		return card and card:targetFilter(targetlist, to_select, sgs.Self) and not sgs.Self:isProhibited(to_select, card, targetlist)
+		return card and card:targetFilter(targetlist, to_select, player) and not player:isProhibited(to_select, card, targetlist)
 	end ,
 
 	feasible = function(self, targets)
@@ -196,7 +178,7 @@ luaaocaiCard = sgs.CreateSkillCard{
 	
 	on_validate_in_response = function(self, user)
 		local room = user:getRoom()
-		local card, log = luaaocaiView(self, room, user, self:getUserString())
+		local card, log = LuaAocaiView(self, room, user, self:getUserString())
 		if card then room:sendLog(log) end
 		return card
 	end,
@@ -204,36 +186,24 @@ luaaocaiCard = sgs.CreateSkillCard{
 	on_validate = function(self, cardUse)
 		cardUse.m_isOwnerUse = false
 		local room = cardUse.from:getRoom()
-		local card, log = luaaocaiView(self, room, cardUse.from, self:getUserString())
+		local card, log = LuaAocaiView(self, room, cardUse.from, self:getUserString())
 		if card then room:sendLog(log) end
 		return card
 	end,
 }
 
-luaaocaiCard2 = sgs.CreateSkillCard{
-	name = luaaocaiCard.name,
-	skill_name = luaaocaiCard.skill_name,
-	target_fixed = true,
-	will_throw = false,
-	handling_method = sgs.Card_MethodNone,
-	on_validate_in_response = luaaocaiCard.on_validate_in_response,
-	on_validate = luaaocaiCard.on_validate,
-}
-
-luaaocai = sgs.CreateZeroCardViewAsSkill{
-	name = "luaaocai",
+LuaAocai = sgs.CreateZeroCardViewAsSkill{
+	name = "LuaAocai",
 
 	view_as = function(self)
 		local patterns = sgs.Sanguosha:getCurrentCardUsePattern():split("+")
 		for _, pat in ipairs(patterns) do
 			if pat == "peach" and sgs.Self:hasFlag("Global_PreventPeach") then table.removeOne(patterns, pat) end
 		end
-		local targetFixed = false
 		local card = sgs.Sanguosha:cloneCard(patterns[1])
+		local skillcard = LuaAocaiCard:clone()
+		skillcard:setTargetFixed(card:targetFixed() or sgs.Sanguosha:getCurrentCardUseReason() == sgs.CardUseStruct_CARD_USE_REASON_RESPONSE)
 		card:deleteLater()
-		targetFixed = card:targetFixed() or sgs.Sanguosha:getCurrentCardUseReason() == sgs.CardUseStruct_CARD_USE_REASON_RESPONSE
-
-		local skillcard = targetFixed and luaaocaiCard2:clone() or luaaocaiCard:clone()
 		skillcard:setUserString(table.concat(patterns, "+")) 
 		skillcard:setSkillName(self:objectName())
 		skillcard:setShowSkill(self:objectName())
@@ -247,7 +217,7 @@ luaaocai = sgs.CreateZeroCardViewAsSkill{
 	enabled_at_response = function(self, player, pattern)
 		if pattern =="peach" and player:hasFlag("Global_PreventPeach") then return false end
 		if string.find(pattern, "slash") or string.find(pattern, "peach") or string.find(pattern, "jink") or string.find(pattern, "analeptic") then
-			return player:getPhase() == sgs.Player_NotActive and not player:hasFlag("Global_luaaocaiFailed")
+			return player:getPhase() == sgs.Player_NotActive and not player:hasFlag("Global_LuaAocaiFailed")
 		end
 		return false
 	end,
