@@ -1,8 +1,67 @@
 --[[
 	国战技能速查手册（K区）
 	技能索引：
-	看破、克己、空城、苦肉、狂斧、狂骨    
+	慷忾、看破、克己、空城、苦肉、狂斧、狂骨    
 ]]--
+
+--[[
+	慷忾
+	相关武将：身份-SP曹昂
+	描述：一名角色成为【杀】的目标后，若你与其的距离不大于1， 你可摸一张牌，然后你将一张牌正面朝上交给该角色，若此牌为装备牌，其可使用之。    
+	引用：
+	状态：
+]]
+
+luakangkai = sgs.CreateTriggerSkill{
+	name = "luakangkai",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.TargetConfirmed,
+	
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return "" end
+		local use = data:toCardUse()
+		local trigger_list_skill, trigger_list_who = {}, {}
+
+		if use.card:isKindOf("Slash") and use.to:contains(player) then 
+			for _, caoang in sgs.qlist(room:findPlayersBySkillName(self:objectName())) do
+				if caoang:distanceTo(player) <= 1 then
+					table.insert(trigger_list_skill, self:objectName())
+					table.insert(trigger_list_who, caoang:objectName())
+				end
+			end
+		end
+
+		return table.concat(trigger_list_skill, "|"), table.concat(trigger_list_who, "|")
+	end,
+	
+	on_cost = function(self, event, room, player, data, caoang)
+		local target_data = sgs.QVariant()
+		target_data:setValue(player)
+		if caoang:askForSkillInvoke(self:objectName(), target_data) then
+			room:broadcastSkillInvoke(self:objectName(), yuanshu)
+			room:doAnimate(1, caoang:objectName(), player:objectName())
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data, caoang)
+		caoang:drawCards(1, "luakangkai")
+		if caoang:objectName() ~= player:objectName() and not caoang:isNude() then
+			local card = sgs.Sanguosha:getCard(room:askForExchange(caoang, self:objectName(), 1, true, "@luakangkai-give:"..player:objectName(), false):getEffectiveId())
+			local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_GIVE, caoang:objectName(), self:objectName(), "")
+			room:obtainCard(player, card, reason, true)
+			if player:isAlive() and card:getTypeId() == sgs.Card_TypeEquip and room:getCardOwner(card:getEffectiveId()):objectName() == player:objectName() and not player:isLocked(card) then
+				player:setTag("kangkaiSlash", data) --For AI
+				room:askForUseCard(player, card:getEffectiveId(), "@luakangkai-use:::"..card:objectName()..":"..card:getSuitString().."_char\\"..card:getNumberString()..":"..card:getEffectiveId())
+				player:removeTag("kangkaiSlash")
+			end 
+		end
+		return false
+	end,
+}
+
 --[[
 	看破
 	相关武将：标-卧龙诸葛亮

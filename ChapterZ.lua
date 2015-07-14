@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（Z区）
 	技能索引：
-	再起、章武、鸩毒、制衡、直谏、资粮  
+	再起、章武、鸩毒、贞烈、制衡、直谏、直言、资粮、纵玄、
 ]]--
 --[[
 	再起
@@ -84,6 +84,54 @@ LuaZaiqi = sgs.CreatePhaseChangeSkill{
 	引用：
 	状态：
 ]]
+
+--[[
+	贞烈
+	相关武将：身份-王异
+	描述：当你成为其他角色使用【杀】或非延时类锦囊牌的目标后，你可失去1点体力，令此牌对你无效，然后你弃置其一张牌。 
+	引用：
+	状态：1.2.0 验证通过
+]]
+
+luazhenlie = sgs.CreateTriggerSkill{
+	name = "luazhenlie",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.TargetConfirmed,
+
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and player:getHp() > 0 then
+			local use = data:toCardUse()
+			if use.from and use.from:objectName() ~= player:objectName() and use.to:contains(player) then
+				if use.card:isKindOf("Slash") or use.card:isNDTrick() then return self:objectName() end
+			end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			room:loseHp(player)
+			if player:isAlive() then return true end
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local use = data:toCardUse()
+		local nullified_list = use.nullified_list
+		table.insert(nullified_list, player:objectName())
+		use.nullified_list = nullified_list
+		data:setValue(use)
+		if player:canDiscard(use.from, "he") then
+			local id = room:askForCardChosen(player, use.from, "he", self:objectName(), false, sgs.Card_MethodDiscard)
+			room:throwCard(id, use.from, player)
+		end
+		return false 
+	end,
+}
+
 --[[
 	制衡
 	相关武将：标-孙权
@@ -170,6 +218,57 @@ LuaZhijian = sgs.CreateOneCardViewAsSkill{
 }
 
 --[[
+	直言
+	相关武将：身份-虞翻
+	描述：结束阶段开始时，你可以令一名角色摸一张牌，然后展示之，若此牌为装备牌，该角色先回复1点体力再使用此牌。
+	引用：
+	状态：1.2.0 验证通过
+]]
+
+luazhiyan = sgs.CreateTriggerSkill{
+	name = "luazhiyan",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.EventPhaseStart,
+	
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Finish) then return "" end
+		return self:objectName()
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local to = room:askForPlayerChosen(player, room:getAlivePlayers(), self:objectName(), self:objectName().."-invoke", true, true)
+		if to then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			local to_data = sgs.QVariant()
+			to_data:setValue(to)
+			player:setTag(self:objectName(), to_data)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local to = player:getTag(self:objectName()):toPlayer()
+		player:removeTag(self:objectName())
+		local ids = room:getNCards(1, false)
+		local card = sgs.Sanguosha:getCard(ids:first())
+		room:obtainCard(to, card, false)
+		if to:isAlive() then
+			room:showCard(to, ids:first())
+			if not card:isKindOf("EquipCard") then return false end
+			local recover = sgs.RecoverStruct()
+			recover.who = player
+			room:recover(to, recover)
+			if to:isAlive() and room:getCardOwner(ids:first()):objectName() == to:objectName() and not to:isLocked(card) then
+				room:useCard(sgs.CardUseStruct(card, to, to))
+			end
+		end
+		return false 
+	end,
+}
+
+--[[
 	资粮
 	相关武将：阵-邓艾
 	描述：副将技，每当与你势力相同的一名角色受到伤害后，你可以将一张“田”交给该角色。
@@ -240,4 +339,157 @@ LuaZiliang = sgs.CreateTriggerSkill{
 		end
         room:obtainCard(p, id)
 	end,
+}
+
+--[[
+	纵玄
+	相关武将：身份-虞翻
+	描述：每当你的牌因弃置而置入弃牌堆前，你可以将其中至少一张牌以任意顺序置于牌堆顶。
+	引用：
+	状态：1.2.0 验证通过
+	备注：操作方式改为先点击的牌会置于摸牌堆的上方
+]]
+
+luazongxuanCard = sgs.CreateSkillCard{
+	name = "luazongxuanCard",
+	skill_name = "luazongxuan",
+	target_fixed = true,
+	will_throw = false,
+	handling_method = sgs.Card_MethodNone,
+
+	on_use = function(self, room, source, targets)
+		local zongxuanPut = {}
+		for _, id in sgs.qlist(self:getSubcards()) do
+			table.insert(zongxuanPut, tostring(id))
+		end
+		source:setTag("zongxuanPut", sgs.QVariant(table.concat(zongxuanPut, "+")))
+	end,
+}
+
+luazongxuanVS = sgs.CreateViewAsSkill{
+	name = "luazongxuan", 
+	n = 10086, 
+	response_pattern = "@@luazongxuan",
+
+	view_filter = function(self, selected, to_select)
+		local zongxuanCards = sgs.Self:property("zongxuan_toget"):toString():split("+")
+		return table.contains(zongxuanCards, tostring(to_select:getId()))
+	end, 
+
+	view_as = function(self, originalCards) 
+		if #originalCards > 0 then
+			local skillcard = luazongxuanCard:clone()
+			for i = #originalCards, 1, -1 do
+				skillcard:addSubcard(originalCards[i])
+			end
+			skillcard:setSkillName(self:objectName())
+			skillcard:setShowSkill(self:objectName())
+			return skillcard
+		end
+	end,
+
+	enabled_at_play = function(self, player)
+		return false
+	end,
+}
+
+luazongxuan = sgs.CreateTriggerSkill{
+	name = "luazongxuan",
+	can_preshow = true,
+	events = sgs.BeforeCardsMove,
+	view_as_skill = luazongxuanVS,
+
+	on_record = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return end
+		if not player:hasSkill(self:objectName()) then player:removeTag("zongxuanCards_strings") return end
+		local move = data:toMoveOneTime()
+		if move.from and move.from:objectName() == player:objectName() and bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
+			local card_ids = {}
+			if move.to_place == sgs.Player_PlaceTable then
+				for i = 0, move.card_ids:length()-1, 1 do
+					local card_id = move.card_ids:at(i)	
+					if room:getCardOwner(card_id):objectName() == move.from:objectName() and move.from_places:at(i) == sgs.Player_PlaceHand or move.from_places:at(i) == sgs.Player_PlaceEquip then
+						table.insert(card_ids, tostring(card_id))
+					end
+				end
+			end
+			if #card_ids > 0 then
+				local zongxuanCards_strings = player:getTag("zongxuanCards_strings"):toString()
+				zongxuanCards_strings = zongxuanCards_strings.."|"..table.concat(card_ids, "+")
+				player:setTag("zongxuanCards_strings", sgs.QVariant(zongxuanCards_strings))
+			end
+		end
+	end,
+	
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName())) then return "" end
+		local zongxuanCards_strings = player:getTag("zongxuanCards_strings"):toString()
+		if zongxuanCards_strings == "" then return "" end
+		local move, zongxuan_table  = data:toMoveOneTime(), zongxuanCards_strings:split("|")
+		if move.from and move.from:objectName() == player:objectName() and bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then		
+			local zongxuanCards_string, zongxuan_ids = zongxuan_table[#zongxuan_table], {}
+			if move.from_places:contains(sgs.Player_PlaceTable) and move.to_place == sgs.Player_DiscardPile then
+				for _, idstring in ipairs(zongxuanCards_string:split("+")) do
+					if room:getCardPlace(tonumber(idstring)) == sgs.Player_PlaceTable then table.insert(zongxuan_ids, idstring) end
+				end
+				room:setPlayerProperty(player, "zongxuan_toget", sgs.QVariant(table.concat(zongxuan_ids, "+")))
+				if #zongxuan_ids > 0 then return self:objectName() end
+			end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local zongxuanCards_strings = player:getTag("zongxuanCards_strings"):toString():split("|")
+		table.remove(zongxuanCards_strings)
+		player:setTag("zongxuanCards_strings", sgs.QVariant(table.concat(zongxuanCards_strings, "|")))
+
+		local zongxuanCards = player:property("zongxuan_toget"):toString():split("+")
+		local cards = sgs.IntList()
+		for _, idstring in ipairs(zongxuanCards) do 
+			cards:append(tonumber(idstring))
+		end
+
+		room:setPlayerFlag(player, "zongxuan_InTempMoving")
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_UNKNOWN, player:objectName())
+		local fake_move = sgs.CardsMoveStruct(cards, nil, player, sgs.Player_PlaceTable, sgs.Player_PlaceHand, reason)
+		local moves = sgs.CardsMoveList()
+		moves:append(fake_move)
+		local yufan = sgs.SPlayerList()
+		yufan:append(player)
+		room:notifyMoveCards(true, moves, true, yufan)
+		room:notifyMoveCards(false, moves, true, yufan)
+		local invoke = room:askForUseCard(player, "@@luazongxuan", "@luazongxuan", -1, sgs.Card_MethodNone)
+		local fake_move2 = sgs.CardsMoveStruct(cards, player, nil, sgs.Player_PlaceHand, sgs.Player_PlaceTable, reason)
+		local moves2 = sgs.CardsMoveList()
+		moves2:append(fake_move2)
+		room:notifyMoveCards(true, moves2, true, yufan)
+		room:notifyMoveCards(false, moves2, true, yufan)
+		room:setPlayerFlag(player, "-zongxuan_InTempMoving")
+		
+		if invoke then return true end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local move = data:toMoveOneTime()
+		local zongxuanCards = sgs.IntList()
+		local zongxuanPut = player:getTag("zongxuanPut"):toString():split("+")
+		player:removeTag("zongxuanPut")
+		for _, idstring in ipairs(zongxuanPut) do
+			local id = tonumber(idstring)
+			zongxuanCards:append(id)
+			move.from_places:removeAt(move.card_ids:indexOf(id))
+			move.card_ids:removeOne(id)
+		end
+		data:setValue(move)
+		room:setPlayerFlag(player, "zongxuan_InTempMoving")
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PUT, player:objectName(), self:objectName(), "")
+		local move = sgs.CardsMoveStruct(zongxuanCards, player, nil, sgs.Player_PlaceTable, sgs.Player_DrawPile, reason)
+		local moves = sgs.CardsMoveList()
+		moves:append(move)
+		room:moveCardsAtomic(moves, false)
+		room:setPlayerFlag(player, "-zongxuan_InTempMoving")
+		return false
+	end,	
 }

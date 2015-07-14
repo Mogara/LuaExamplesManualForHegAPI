@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（J区）
 	技能索引：
-	激昂、急救、急袭、激诏、集智、奸雄、节命、结姻、据守、巨象  
+	激昂、急救、急袭、激诏、集智、奸雄、奸雄·界限、节命、结姻、精策、酒诗、据守、巨象  
 ]]--
 --[[
 	激昂
@@ -140,6 +140,67 @@ Luajianxiong = sgs.CreateTriggerSkill{
 }
 
 --[[
+	奸雄
+	相关武将：身份-曹操·界限突破
+	描述：每当你受到伤害后，你可以选择一项：获得对你造成伤害的牌，或摸一张牌。   
+	引用：
+	状态：1.2.0 验证通过
+]]
+
+LuaJianxiongJx = sgs.CreateTriggerSkill{
+	name = "LuaJianxiongJx",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.Damaged,
+	
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName())) then return "" end
+		return self:objectName()
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local damage = data:toDamage()
+		local choices = {"draw"}
+
+		local card = damage.card
+		if card then
+			local ids = sgs.IntList()
+			if card:isVirtualCard() then
+				ids = card:getSubcards()
+			else
+				ids:append(card:getEffectiveId())
+			end
+			if ids:length() > 0 then
+				local all_place_table = true
+				for _,id in sgs.qlist(ids) do
+					if room:getCardPlace(id) ~= sgs.Player_PlaceTable then
+						all_place_table = false
+						break
+					end
+				end
+				if all_place_table then table.insert(choices, "obtain") end
+			end
+		end
+
+		local choice = room:askForChoice(player, self:objectName(), table.concat(choices, "+"), data)
+		if choice == "obtain" then
+			player:obtainCard(card)
+		else
+			player:drawCards(1, self:objectName())
+		end
+		return false 
+	end,
+}
+
+--[[
 	节命
 	相关武将：标-荀彧
 	描述：每当你受到1点伤害后，你可以令一名角色将手牌补至X张（X为该角色的体力上限且至多为5）。   
@@ -229,6 +290,7 @@ LuaJieyinCard = sgs.CreateSkillCard{
 		end
 	end,
 }
+
 LuaJieyin = sgs.CreateViewAsSkill{
 	name = "LuaJieyin",
 	enabled_at_play = function(self,player)
@@ -248,6 +310,122 @@ LuaJieyin = sgs.CreateViewAsSkill{
 		jieyin_card:setSkillName(self:objectName())
         jieyin_card:setShowSkill(self:objectName())
         return jieyin_card
+	end,
+}
+
+--[[
+	精策
+	相关武将：身份-郭淮
+	描述：出牌阶段结束时，若你于此回合内使用过的牌数不小于你的体力值，你可摸两张牌。  
+	引用：
+	状态：
+]]
+
+luajingce = sgs.CreateTriggerSkill{
+	name = "luajingce",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.EventPhaseEnd, sgs.PreCardUsed},
+
+	on_record = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return end
+		if event == sgs.PreCardUsed then
+			local card
+			if event == sgs.PreCardUsed or event == sgs.CardUsed then
+				card = data:toCardUse().card
+			elseif event == sgs.CardResponded then
+				local response = data:toCardResponse()
+				card = response.m_isUse and response.m_card
+			end
+			if card and card:getHandlingMethod() == sgs.Card_MethodUse and card:getTypeId() ~= sgs.Card_TypeSkill then
+				if player:getPhase() <= sgs.Player_Play then player:addMark(self:objectName()) end
+			end
+		elseif event == sgs.EventPhaseEnd and player:getPhase() == sgs.Player_Finish then
+			player:setMark(self:objectName(), 0)
+		end
+	end,
+	
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and event == sgs.EventPhaseEnd and player:getPhase() == sgs.Player_Play then
+			if player:getMark(self:objectName()) >= player:getHp() then
+				return self:objectName()
+			end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		player:drawCards(2, self:objectName())
+		return false 
+	end,
+}
+
+--[[
+	酒诗
+	相关武将：身份-曹植
+	描述：每当你需要使用【酒】时，若你处于平置状态，你可以叠置，视为使用一张【酒】；若你因受到伤害而扣减体力前你处于叠置状态，此伤害结算结束后你可以叠置。  
+	引用：
+	状态：
+]]
+
+luajiushiVS = sgs.CreateZeroCardViewAsSkill{   
+	name = "luajiushi",
+	
+	view_as = function(self)
+		local analeptic = sgs.Sanguosha:cloneCard("analeptic", sgs.Card_NoSuit, 0)
+		analeptic:setSkillName(self:objectName())
+		analeptic:setShowSkill(self:objectName())
+		return analeptic
+	end,
+
+	enabled_at_play = function(self, player)
+		return sgs.Analeptic_IsAvailable(player) and player:faceUp()
+	end,
+
+	enabled_at_response = function(self, player, pattern)
+		return string.find(pattern, "analeptic") and player:faceUp()
+	end
+}
+
+luajiushi = sgs.CreateTriggerSkill{
+	name = "luajiushi",
+	can_preshow = false,
+	events = {sgs.PreCardUsed, sgs.PreDamageDone, sgs.DamageComplete},
+	view_as_skill = luajiushiVS,
+	
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return "" end
+		if event == sgs.PreDamageDone then
+			player:setTag("PredamagedFace", sgs.QVariant(not player:faceUp()))
+		elseif event == sgs.PreCardUsed and player:hasSkill(self:objectName()) then
+			if data:toCardUse().card:getSkillName() == self:objectName() then return self:objectName() end
+		elseif event == sgs.DamageComplete and player:hasSkill(self:objectName()) then
+			local facedown = player:getTag("PredamagedFace"):toBool()
+			player:removeTag("PredamagedFace")
+			if facedown and not player:faceUp() then return self:objectName() end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if event == sgs.PreCardUsed or player:askForSkillInvoke(self:objectName(), data) then
+			if event == sgs.DamageComplete then room:broadcastSkillInvoke(self:objectName(), player) end
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		player:turnOver()
+		return false 
 	end,
 }
 

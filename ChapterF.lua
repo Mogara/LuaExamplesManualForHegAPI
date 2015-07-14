@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（F区）
 	技能索引：
-	反间、反馈、放权、放逐、奋命、奋迅、锋矢
+	反间、反馈、反馈·界限、放权、放逐、奋命、奋迅、锋矢
 ]]--
 
 --[[
@@ -91,6 +91,49 @@ LuaFankui = sgs.CreateTriggerSkill{
 		local card_id = room:askForCardChosen(player, damage.from, "he", self:objectName())
         room:obtainCard(player, sgs.Sanguosha:getCard(card_id), sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_EXTRACTION, player:objectName(), self:objectName(), ""), false)
 	end
+}
+
+--[[
+	反馈
+	相关武将：身份-司马懿·界限突破
+	描述：每当你受到1点伤害后，你可以获得来源的一张牌。 
+	引用：
+	状态：1.2.0 验证通过
+]]
+
+LuaFankuiJx = sgs.CreateTriggerSkill{
+	name = "LuaFankuiJx",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.Damaged,
+	
+	can_trigger = function(self, event, room, player, data)
+		local trigger_list = {}
+		if player and player:isAlive() and player:hasSkill(self:objectName()) then	
+			local damage = data:toDamage()
+			if damage.from and damage.from:isAlive() and not damage.from:isNude() then
+				for i = 1, damage.damage do
+					table.insert(trigger_list, self:objectName())
+				end
+			end
+		end
+		return table.concat(trigger_list, ",")
+	end,
+
+	on_cost = function(self, event, room, player, data, simayi)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data, simayi)
+		local card_id = room:askForCardChosen(simayi, data:toDamage().from, "he", self:objectName())
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_EXTRACTION, simayi:objectName())
+		room:obtainCard(simayi, sgs.Sanguosha:getCard(card_id), reason, false)
+		return false 
+	end,
 }
 
 --[[
