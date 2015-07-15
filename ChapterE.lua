@@ -12,8 +12,8 @@
 	状态：1.2.0 验证通过
 ]]
 
-luaenyuan = sgs.CreateTriggerSkill{
-	name = "luaenyuan",
+LuaEnyuan = sgs.CreateTriggerSkill{
+	name = "LuaEnyuan",
 	can_preshow = true,
 	frequency = sgs.Skill_Frequent,
 	events = {sgs.CardsMoveOneTime, sgs.Damaged},
@@ -49,7 +49,7 @@ luaenyuan = sgs.CreateTriggerSkill{
 	on_effect = function(self, event, room, player, data)
 		if event == sgs.Damaged then
 			local damage = data:toDamage()
-			local card = room:askForExchange(damage.from, self:objectName(), 1, false, self:objectName().."Give::"..player:objectName(), true)
+			local card = room:askForExchange(damage.from, self:objectName(), 1, 0, self:objectName().."Give::"..player:objectName(), "", ".|.|.|hand")
 			if card then
 				local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_GIVE, damage.from:objectName(), player:objectName(), self:objectName(), "")
 				room:obtainCard(player, card, reason, true)
