@@ -135,7 +135,9 @@ local LuaAocaiView = function(self, room, player, pattern)
 	room:doNotify(player,sgs.CommandType.S_COMMAND_LOG_SKILL, log2:toVariant())
 
 	for _, pat in ipairs(pattern:split("+")) do
-		table.insert(enablepattern, string.upper(string.sub(pat, 1, 1))..string.sub(pat, 2))
+		local basic = sgs.Sanguosha:cloneCard(pat)
+		if basic:isKindOf("BasicCard") then table.insert(enablepattern, basic:getClassName()) end
+		basic:deleteLater()
 	end
 
 	local ids2 = room:notifyChooseCards(player, ids, self:getSkillName(), sgs.Player_DrawPile, sgs.Player_PlaceTable, 1, 0, "@"..self:getSkillName(), table.concat(enablepattern, ",").."|.|.|#"..self:getSkillName())
@@ -168,12 +170,12 @@ LuaAocaiCard = sgs.CreateSkillCard{
 		return card and card:targetFilter(targetlist, to_select, player) and not player:isProhibited(to_select, card, targetlist)
 	end ,
 
-	feasible = function(self, targets)
+	feasible = function(self, targets, player)
 		local targetlist = sgs.PlayerList()
 		for i = 1, #targets do targetlist:append(targets[i]) end
 		local card = sgs.Sanguosha:cloneCard(self:getUserString())
 		card:deleteLater()
-		return card and card:targetsFeasible(targetlist, sgs.Self)
+		return card and card:targetsFeasible(targetlist, player)
 	end,
 	
 	on_validate_in_response = function(self, user)
@@ -197,9 +199,7 @@ LuaAocai = sgs.CreateZeroCardViewAsSkill{
 
 	view_as = function(self)
 		local patterns = sgs.Sanguosha:getCurrentCardUsePattern():split("+")
-		for _, pat in ipairs(patterns) do
-			if pat == "peach" and sgs.Self:hasFlag("Global_PreventPeach") then table.removeOne(patterns, pat) end
-		end
+		if sgs.Self:hasFlag("Global_PreventPeach") then table.removeAll(patterns, "peach") end
 		local card = sgs.Sanguosha:cloneCard(patterns[1])
 		local skillcard = LuaAocaiCard:clone()
 		skillcard:setTargetFixed(card:targetFixed() or sgs.Sanguosha:getCurrentCardUseReason() == sgs.CardUseStruct_CARD_USE_REASON_RESPONSE)
@@ -216,8 +216,12 @@ LuaAocai = sgs.CreateZeroCardViewAsSkill{
 
 	enabled_at_response = function(self, player, pattern)
 		if pattern =="peach" and player:hasFlag("Global_PreventPeach") then return false end
-		if string.find(pattern, "slash") or string.find(pattern, "peach") or string.find(pattern, "jink") or string.find(pattern, "analeptic") then
-			return player:getPhase() == sgs.Player_NotActive and not player:hasFlag("Global_LuaAocaiFailed")
+		for _, pat in ipairs(pattern:split("+")) do
+			local basiccard = sgs.Sanguosha:cloneCard(pat)
+			basiccard:deleteLater()
+			if basiccard:isKindOf("BasicCard") then 
+				return player:getPhase() == sgs.Player_NotActive and not player:hasFlag("Global_LuaAocaiFailed")
+			end
 		end
 		return false
 	end,
