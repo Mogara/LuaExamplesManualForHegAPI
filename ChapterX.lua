@@ -242,8 +242,8 @@ LuaXiongyi = sgs.CreateTriggerSkill{
 	状态：1.2.0 验证通过
 ]]
 
-luaxuanhuo = sgs.CreateTriggerSkill{
-	name = "luaxuanhuo",
+LuaXuanhuo = sgs.CreateTriggerSkill{
+	name = "LuaXuanhuo",
 	can_preshow = true,
 	frequency = sgs.Skill_Frequent,
 	events = sgs.EventPhaseStart,
@@ -289,28 +289,18 @@ luaxuanhuo = sgs.CreateTriggerSkill{
 			if not victim or not room:askForUseSlashTo(target, victim, self:objectName().."-slash::"..victim:objectName()) then		
 				room:broadcastSkillInvoke(self:objectName(), 2, player)
 				if not target:isNude() then
+					local cards = room:askForCardsChosen(player, target, "he^false|he^false", self:objectName())
 					local dummy = sgs.Sanguosha:cloneCard("jink")
-
-					room:setPlayerFlag(target, "Global_InTempMoving")
-					local first_id = room:askForCardChosen(player, target, "he", self:objectName())
-					local original_place = room:getCardPlace(first_id)
-					dummy:addSubcard(first_id)
-					target:addToPile("#"..self:objectName(), dummy, false)
-					if not target:isNude() then
-						local second_id = room:askForCardChosen(player, target, "he", self:objectName())
-						dummy:addSubcard(second_id)
-					end
-					room:moveCardTo(sgs.Sanguosha:getCard(first_id), target, original_place, false)
-					room:setPlayerFlag(target, "-Global_InTempMoving")
-
+					dummy:addSubcards(cards)
 					player:obtainCard(dummy, false)
-					dummy:deleteLater()
+					dummy:deleteLater() 
 				end
 			end
 		end
 		return true
 	end,
 }
+
 
 --[[
 	恂恂
