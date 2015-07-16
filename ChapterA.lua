@@ -117,8 +117,6 @@ LuaAnxu = sgs.CreateZeroCardViewAsSkill{
 
 local LuaAocaiView = function(self, room, player, pattern)
 	local json = require ("json")
-	local ids = room:getNCards(2, false)
-
 	room:doBroadcastNotify(sgs.CommandType.S_COMMAND_INVOKE_SKILL, json.encode({self:getSkillName(), player:objectName()}))
 	room:notifySkillInvoked(player, self:getSkillName())
 	room:broadcastSkillInvoke(self:getSkillName(), player)
@@ -127,13 +125,13 @@ local LuaAocaiView = function(self, room, player, pattern)
 		player:showGeneral(player:inHeadSkills(self:showSkill()))
 	end
 
+	local ids, enablepattern = room:getNCards(2, false), {}
 	local log2 = sgs.LogMessage()
 	log2.type = "$ViewDrawPile"
 	log2.from = player
 	log2.card_str = table.concat(sgs.QList2Table(ids), "+")
 	room:doNotify(player,sgs.CommandType.S_COMMAND_LOG_SKILL, log2:toVariant())
 
-	local enablepattern = {}
 	for _, pat in ipairs(pattern:split("+")) do
 		local basic = sgs.Sanguosha:cloneCard(pat)
 		if basic then
