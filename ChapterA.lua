@@ -217,12 +217,11 @@ LuaAocai = sgs.CreateZeroCardViewAsSkill{
 	end,
 
 	enabled_at_response = function(self, player, pattern)
-		if pattern =="peach" and player:hasFlag("Global_PreventPeach") then return false end
 		for _, pat in ipairs(pattern:split("+")) do
 			local basiccard = sgs.Sanguosha:cloneCard(pat)
 			if basiccard then
 				basiccard:deleteLater()
-				if basiccard:isKindOf("BasicCard") then
+				if basiccard:isKindOf("BasicCard") and not (basiccard:isKindOf("Peach") and player:hasFlag("Global_PreventPeach")) then
 					return player:getPhase() == sgs.Player_NotActive and not player:hasFlag("Global_LuaAocaiFailed")
 				end
 			end
