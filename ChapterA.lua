@@ -136,8 +136,10 @@ local LuaAocaiView = function(self, room, player, pattern)
 
 	for _, pat in ipairs(pattern:split("+")) do
 		local basic = sgs.Sanguosha:cloneCard(pat)
-		if basic:isKindOf("BasicCard") then table.insert(enablepattern, basic:getClassName()) end
-		basic:deleteLater()
+		if basic and basic:isKindOf("BasicCard") then 
+			table.insert(enablepattern, basic:getClassName())
+			basic:deleteLater()
+		end
 	end
 
 	local ids2 = room:notifyChooseCards(player, ids, self:getSkillName(), sgs.Player_DrawPile, sgs.Player_PlaceTable, 1, 0, "@"..self:getSkillName(), table.concat(enablepattern, ",").."|.|.|$"..self:getSkillName())
@@ -218,8 +220,8 @@ LuaAocai = sgs.CreateZeroCardViewAsSkill{
 		if pattern =="peach" and player:hasFlag("Global_PreventPeach") then return false end
 		for _, pat in ipairs(pattern:split("+")) do
 			local basiccard = sgs.Sanguosha:cloneCard(pat)
-			basiccard:deleteLater()
-			if basiccard:isKindOf("BasicCard") then 
+			if basiccard and basiccard:isKindOf("BasicCard") then
+				basiccard:deleteLater()
 				return player:getPhase() == sgs.Player_NotActive and not player:hasFlag("Global_LuaAocaiFailed")
 			end
 		end
