@@ -117,8 +117,7 @@ LuaAnxu = sgs.CreateZeroCardViewAsSkill{
 
 local LuaAocaiView = function(self, room, player, pattern)
 	local json = require ("json")
-	local enablepattern, ids = {}, sgs.IntList()
-	for i = 0, 1 do ids:append(room:getDrawPile():at(i)) end
+	local ids = room:getNCards(2, false)
 
 	room:doBroadcastNotify(sgs.CommandType.S_COMMAND_INVOKE_SKILL, json.encode({self:getSkillName(), player:objectName()}))
 	room:notifySkillInvoked(player, self:getSkillName())
@@ -134,13 +133,18 @@ local LuaAocaiView = function(self, room, player, pattern)
 	log2.card_str = table.concat(sgs.QList2Table(ids), "+")
 	room:doNotify(player,sgs.CommandType.S_COMMAND_LOG_SKILL, log2:toVariant())
 
+	local enablepattern = {}
 	for _, pat in ipairs(pattern:split("+")) do
 		local basic = sgs.Sanguosha:cloneCard(pat)
-		if basic:isKindOf("BasicCard") then table.insert(enablepattern, basic:getClassName()) end
-		basic:deleteLater()
+		if basic then
+			basic:deleteLater()
+			if basic:isKindOf("BasicCard") then table.insert(enablepattern, basic:getClassName()) end
+		end
 	end
 
 	local ids2 = room:notifyChooseCards(player, ids, self:getSkillName(), sgs.Player_DrawPile, sgs.Player_PlaceTable, 1, 0, "@"..self:getSkillName(), table.concat(enablepattern, ",").."|.|.|$"..self:getSkillName())
+	room:returnToDrawPile(ids, false)
+
 	local log, card = sgs.LogMessage()
 	if ids2:length() == 1 then 
 		card = sgs.Sanguosha:getCard(ids2:first())
@@ -218,9 +222,11 @@ LuaAocai = sgs.CreateZeroCardViewAsSkill{
 		if pattern =="peach" and player:hasFlag("Global_PreventPeach") then return false end
 		for _, pat in ipairs(pattern:split("+")) do
 			local basiccard = sgs.Sanguosha:cloneCard(pat)
-			basiccard:deleteLater()
-			if basiccard:isKindOf("BasicCard") then 
-				return player:getPhase() == sgs.Player_NotActive and not player:hasFlag("Global_LuaAocaiFailed")
+			if basiccard then
+				basiccard:deleteLater()
+				if basiccard:isKindOf("BasicCard") then
+					return player:getPhase() == sgs.Player_NotActive and not player:hasFlag("Global_LuaAocaiFailed")
+				end
 			end
 		end
 		return false
