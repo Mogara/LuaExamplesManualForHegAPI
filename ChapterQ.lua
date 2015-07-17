@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（Q区）
 	技能索引：
-	奇才、戚乱、奇袭、千幻、潜袭、谦逊、强袭、倾城、倾国、青囊、巧变、驱虎    
+	奇才、戚乱、奇袭、千幻、潜袭、谦逊、强袭、琴音、倾城、倾国、青囊、巧变、驱虎    
 ]]--
 --[[
 	奇才
@@ -163,6 +163,75 @@ luaQiangxi = sgs.CreateViewAsSkill{
 	end, 
 	enabled_at_play = function(self, player)
 		return not player:hasUsed("#luaQiangxiCard")
+	end,
+}
+
+--[[
+	琴音
+	相关武将：身份-神·周瑜
+	描述：弃牌阶段结束时，若你于此阶段内弃置过你的至少两张手牌，你可选择一项：1.令所有角色各回复1点体力；2.令所有角色各失去1点体力。
+	引用：
+	状态：1.2.1验证通过
+]]
+
+LuaQinyin = sgs.CreateTriggerSkill{
+	name = "LuaQinyin",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.CardsMoveOneTime, sgs.EventPhaseEnd, sgs.EventPhaseChanging},
+	
+	on_record = function(self, event, room, player, data)
+		if event == sgs.EventPhaseChanging then
+			if data:toPhaseChange().from == sgs.Player_Discard then player:setMark(self:objectName(), 0) end
+		elseif event == sgs.CardsMoveOneTime and player:getPhase() == sgs.Player_Discard then
+			local move = data:toMoveOneTime()
+			if move.from and move.from:objectName() == player:objectName() and bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
+				for i = 0, move.card_ids:length()-1, 1 do
+					if move.from_places:at(i) == sgs.Player_PlaceHand then player:addMark(self:objectName()) end
+				end
+			end	
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and event == sgs.EventPhaseEnd then
+			if player:getPhase() == sgs.Player_Discard and player:getMark(self:objectName()) >= 2 then
+				return self:objectName()
+			end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local choices = {"loseHp"}
+		for _, p in sgs.qlist(room:getAlivePlayers()) do
+			if p:isWounded() then
+				table.insert(choices, "recoverHp")
+				break
+			end
+		end
+		local choice = room:askForChoice(player, self:objectName(), table.concat(choices, "+"))
+		if choice == "recoverHp" then
+			room:broadcastSkillInvoke(self:objectName(), 1, player)
+			for _, p in sgs.qlist(room:getAlivePlayers()) do
+				local recover = sgs.RecoverStruct()
+				recover.who = player
+				room:recover(p, recover)
+			end
+		elseif choice == "loseHp" then
+			room:broadcastSkillInvoke(self:objectName(), 2, player)
+			for _, p in sgs.qlist(room:getAlivePlayers()) do
+				room:loseHp(p)
+			end
+		end
+		return false 
 	end,
 }
 
