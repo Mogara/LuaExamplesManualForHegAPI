@@ -350,54 +350,10 @@ LuaZiliang = sgs.CreateTriggerSkill{
 	备注：操作方式改为先点击的牌会置于摸牌堆的上方
 ]]
 
-luazongxuanCard = sgs.CreateSkillCard{
-	name = "luazongxuanCard",
-	skill_name = "luazongxuan",
-	target_fixed = true,
-	will_throw = false,
-	handling_method = sgs.Card_MethodNone,
-
-	on_use = function(self, room, source, targets)
-		local zongxuanPut = {}
-		for _, id in sgs.qlist(self:getSubcards()) do
-			table.insert(zongxuanPut, tostring(id))
-		end
-		source:setTag("zongxuanPut", sgs.QVariant(table.concat(zongxuanPut, "+")))
-	end,
-}
-
-luazongxuanVS = sgs.CreateViewAsSkill{
-	name = "luazongxuan", 
-	n = 10086, 
-	response_pattern = "@@luazongxuan",
-
-	view_filter = function(self, selected, to_select)
-		local zongxuanCards = sgs.Self:property("zongxuan_toget"):toString():split("+")
-		return table.contains(zongxuanCards, tostring(to_select:getId()))
-	end, 
-
-	view_as = function(self, originalCards) 
-		if #originalCards > 0 then
-			local skillcard = luazongxuanCard:clone()
-			for i = #originalCards, 1, -1 do
-				skillcard:addSubcard(originalCards[i])
-			end
-			skillcard:setSkillName(self:objectName())
-			skillcard:setShowSkill(self:objectName())
-			return skillcard
-		end
-	end,
-
-	enabled_at_play = function(self, player)
-		return false
-	end,
-}
-
 luazongxuan = sgs.CreateTriggerSkill{
 	name = "luazongxuan",
 	can_preshow = true,
 	events = sgs.BeforeCardsMove,
-	view_as_skill = luazongxuanVS,
 
 	on_record = function(self, event, room, player, data)
 		if not (player and player:isAlive()) then return end
@@ -426,6 +382,7 @@ luazongxuan = sgs.CreateTriggerSkill{
 		local zongxuanCards_strings = player:getTag("zongxuanCards_strings"):toString()
 		if zongxuanCards_strings == "" then return "" end
 		local move, zongxuan_table  = data:toMoveOneTime(), zongxuanCards_strings:split("|")
+		
 		if move.from and move.from:objectName() == player:objectName() and bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then		
 			local zongxuanCards_string, zongxuan_ids = zongxuan_table[#zongxuan_table], {}
 			if move.from_places:contains(sgs.Player_PlaceTable) and move.to_place == sgs.Player_DiscardPile then
@@ -450,46 +407,38 @@ luazongxuan = sgs.CreateTriggerSkill{
 			cards:append(tonumber(idstring))
 		end
 
-		room:setPlayerFlag(player, "zongxuan_InTempMoving")
-		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_UNKNOWN, player:objectName())
-		local fake_move = sgs.CardsMoveStruct(cards, nil, player, sgs.Player_PlaceTable, sgs.Player_PlaceHand, reason)
-		local moves = sgs.CardsMoveList()
-		moves:append(fake_move)
-		local yufan = sgs.SPlayerList()
-		yufan:append(player)
-		room:notifyMoveCards(true, moves, true, yufan)
-		room:notifyMoveCards(false, moves, true, yufan)
-		local invoke = room:askForUseCard(player, "@@luazongxuan", "@luazongxuan", -1, sgs.Card_MethodNone)
-		local fake_move2 = sgs.CardsMoveStruct(cards, player, nil, sgs.Player_PlaceHand, sgs.Player_PlaceTable, reason)
-		local moves2 = sgs.CardsMoveList()
-		moves2:append(fake_move2)
-		room:notifyMoveCards(true, moves2, true, yufan)
-		room:notifyMoveCards(false, moves2, true, yufan)
-		room:setPlayerFlag(player, "-zongxuan_InTempMoving")
-		
-		if invoke then return true end
+		local ids = room:notifyChooseCards(player, cards, self:objectName(), sgs.Player_PlaceTable, sgs.Player_PlaceTable, cards:length(), 0, "@"..self:objectName())
+		if ids:length() > 0 then
+			zongxuanPut = sgs.QList2Table(ids)
+			room:setPlayerProperty(player, "zongxuanPut", sgs.QVariant(table.concat(zongxuanPut, "+")))
+			local log = sgs.LogMessage()
+			log.type = "#InvokeSkill"
+			log.from = player
+			log.arg = self:objectName()
+			room:sendLog(log)
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
+
 		return false 
 	end,
 	
 	on_effect = function(self, event, room, player, data)
 		local move = data:toMoveOneTime()
 		local zongxuanCards = sgs.IntList()
-		local zongxuanPut = player:getTag("zongxuanPut"):toString():split("+")
-		player:removeTag("zongxuanPut")
-		for _, idstring in ipairs(zongxuanPut) do
-			local id = tonumber(idstring)
+		local zongxuanPut = player:property("zongxuanPut"):toString():split("+")
+		for i = #zongxuanPut, 1, -1 do
+			local id = tonumber(zongxuanPut[i])
 			zongxuanCards:append(id)
 			move.from_places:removeAt(move.card_ids:indexOf(id))
 			move.card_ids:removeOne(id)
 		end
 		data:setValue(move)
-		room:setPlayerFlag(player, "zongxuan_InTempMoving")
 		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PUT, player:objectName(), self:objectName(), "")
 		local move = sgs.CardsMoveStruct(zongxuanCards, player, nil, sgs.Player_PlaceTable, sgs.Player_DrawPile, reason)
 		local moves = sgs.CardsMoveList()
 		moves:append(move)
 		room:moveCardsAtomic(moves, false)
-		room:setPlayerFlag(player, "-zongxuan_InTempMoving")
 		return false
 	end,	
 }
