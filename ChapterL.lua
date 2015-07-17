@@ -878,15 +878,14 @@ luaLuoyi = sgs.CreateTriggerSkill{
 	状态：
 ]]
 
-lualuoying = sgs.CreateTriggerSkill{
-	name = "lualuoying",
+LuaLuoying = sgs.CreateTriggerSkill{
+	name = "LuaLuoying",
 	can_preshow = true,
 	events = sgs.CardsMoveOneTime,
-	view_as_skill = lualuoyingVS,
 	
 	on_record = function(self, event, room, player, data)
 		if not (player and player:isAlive()) then return end
-		if not player:hasSkill(self:objectName()) then player:removeTag("luoyingCards_strings") return end --多重插入结算中手抖把技能预亮又暗掉依照操作只能这样处理
+		if not player:hasSkill(self:objectName()) then player:removeTag("luoyingCards_strings") return end --关于插入结算中手残把技能预亮又暗掉的处理
 		local move = data:toMoveOneTime()
 		if move.from and move.from:objectName() ~= player:objectName() then
 			local card_ids, dis, jud = {}, (bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD), (move.reason.m_reason == sgs.CardMoveReason_S_REASON_JUDGEDONE)
@@ -938,32 +937,27 @@ lualuoying = sgs.CreateTriggerSkill{
 		for _, idstring in ipairs(luoyingCards) do 
 			cards:append(tonumber(idstring))
 		end
+		
+		local ids = room:notifyChooseCards(player, cards, self:objectName(), sgs.Player_DiscardPile, sgs.Player_PlaceTable, cards:length(), 0, "@LuaLuoying")
+		if ids:length() > 0 then
+			luoyingGet = sgs.QList2Table(ids)
+			room:setPlayerProperty(player, "luoyingGet", sgs.QVariant(table.concat(luoyingGet, "+")))
+			local log = sgs.LogMessage()
+			log.type = "#InvokeSkill"
+			log.from = player
+			log.arg = self:objectName()
+			room:sendLog(log)
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true
+		end
 
-		room:setPlayerFlag(player, "luoying_InTempMoving")
-		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_UNKNOWN, player:objectName())
-		local fake_move = sgs.CardsMoveStruct(cards, nil, player, sgs.Player_DiscardPile, sgs.Player_PlaceHand, reason)
-		local moves = sgs.CardsMoveList()
-		moves:append(fake_move)
-		local caozhi = sgs.SPlayerList()
-		caozhi:append(player)
-		room:notifyMoveCards(true, moves, true, caozhi)
-		room:notifyMoveCards(false, moves, true, caozhi)
-		local invoke = room:askForUseCard(player, "@@lualuoying", "@lualuoying", -1, sgs.Card_MethodNone)
-		local fake_move2 = sgs.CardsMoveStruct(cards, player, nil, sgs.Player_PlaceHand, sgs.Player_DiscardPile, reason)
-		local moves2 = sgs.CardsMoveList()
-		moves2:append(fake_move2)
-		room:notifyMoveCards(true, moves2, true, caozhi)
-		room:notifyMoveCards(false, moves2, true, caozhi)
-		room:setPlayerFlag(player, "-luoying_InTempMoving")
-
-		if invoke then return true end
 		return false 
 	end,
 	
 	on_effect = function(self, event, room, player, data)
 		local move = data:toMoveOneTime()
 		local dummy = sgs.Sanguosha:cloneCard("jink")
-		local luoyingGet = player:getTag("luoyingGet"):toString():split("+")
+		local luoyingGet = player:property("luoyingGet"):toString():split("+")
 		player:removeTag("luoyingGet")
 		for _, idstring in ipairs(luoyingGet) do
 			local id = tonumber(idstring)
