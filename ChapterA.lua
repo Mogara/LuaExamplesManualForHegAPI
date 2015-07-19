@@ -116,9 +116,11 @@ LuaAnxu = sgs.CreateZeroCardViewAsSkill{
 ]]
 
 local LuaAocaiView = function(self, room, player, pattern)
-	local json = require ("json")
-	room:doBroadcastNotify(sgs.CommandType.S_COMMAND_INVOKE_SKILL, json.encode({self:getSkillName(), player:objectName()}))
-	room:notifySkillInvoked(player, self:getSkillName())
+	local log = sgs.LogMessage()
+	log.type = "#InvokeSkill"
+	log.from = player
+	log.arg = self:getSkillName()
+	room:sendLog(log)
 	room:broadcastSkillInvoke(self:getSkillName(), player)
 
 	if player:ownSkill(self:showSkill()) and not player:hasShownSkill(self:showSkill()) then
