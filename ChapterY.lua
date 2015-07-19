@@ -1,8 +1,94 @@
 --[[
 	国战技能速查手册（Y区）
 	技能索引：
-	疑城、遗计、遗志、英魂、鹰扬、英姿、勇决 
+	业炎、疑城、遗计、遗志、英魂、鹰扬、英姿、勇决 
 ]]--
+
+--[[
+	业炎
+	相关武将：身份-神·周瑜
+	描述：限定技，出牌阶段，你可选择一项：1．选择一至三名角色，对这些角色各造成1点火焰伤害；2．弃置四张花色各不相同的手牌并选择一至两名角色，失去3点体力，然后对这些角色造成至多共3点火焰伤害（其中一名角色分配的点数须不小于2）。
+	引用：
+	状态：1.2.1验证通过
+]]
+
+LuaYeyanCard = sgs.CreateSkillCard{
+	name = "LuaYeyanCard",
+	skill_name = "LuaYeyan",
+	target_fixed = false,
+	will_throw = true,
+
+	filter = function(self, targets, to_select, player)
+		if self:subcardsLength() == 4 then
+			local n = 0
+			for _, target in ipairs(targets) do
+				if target:objectName() == to_select:objectName() then n = n+1 end
+			end
+			return (#table.toSet(targets) < 2 or table.contains(targets, to_select)) and (3 - #targets) + n or 0
+		end
+		return #targets < 3
+	end,
+	
+	feasible = function(self, targets, player)
+		if self:subcardsLength() == 4 then
+			return #targets - #table.toSet(targets) >= 1
+		end
+		return #targets > 0
+	end,
+
+	about_to_use = function(self, room, cardUse)
+		room:removePlayerMark(cardUse.from, "@yeyan")
+		local index = self:subcardsLength() == 4 and 2 or 1
+		room:broadcastSkillInvoke(self:objectName(), index, cardUse.from);
+		room:doSuperLightbox(cardUse.from:getGeneralName(), self:getSkillName())
+		self:cardOnUse(room, cardUse)
+	end,
+
+	on_use = function(self, room, source, targets)
+		if self:subcardsLength() == 4 then room:loseHp(source, 3) end
+
+		local targets2 = sgs.SPlayerList()
+		for _, tar in ipairs(table.toSet(targets)) do targets2:append(tar) end
+		room:sortByActionOrder(targets2)
+
+		for _, target in sgs.qlist(targets2) do
+			local point = 0
+			for _, tar in ipairs(targets) do 
+				if tar == target then point = point +1 end
+			end
+			room:damage(sgs.DamageStruct(self:objectName(), source, target, point, sgs.DamageStruct_Fire))
+		end
+	end,
+}
+
+LuaYeyan = sgs.CreateViewAsSkill{   
+	name = "LuaYeyan",
+	limit_mark = "@yeyan",
+	
+	view_filter = function(self, selected, to_select)
+		for _, card in ipairs(selected) do 
+			if to_select:getSuit() == card:getSuit() then return false end
+		end
+		return #selected < 4 and not to_select:isEquipped()
+	end, 
+
+	view_as = function(self, originalCards) 
+		if #originalCards == 0 or #originalCards == 4 then
+			local skillcard = LuaYeyanCard:clone()
+			for _, card in ipairs(originalCards) do
+				skillcard:addSubcard(card)
+			end
+			skillcard:setSkillName(self:objectName())
+			skillcard:setShowSkill(self:objectName())
+			return skillcard
+		end
+	end, 
+
+	enabled_at_play = function(self, player)
+		return player:getMark("@yeyan") > 0
+	end,
+}
+
 --[[
 	疑城
 	相关武将：阵-徐盛
