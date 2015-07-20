@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（G区）
 	技能索引：
-	刚烈、固政、观星、闺秀、鬼才、鬼才·界限、鬼道、国色   
+	刚烈、攻心、固政、观星、闺秀、鬼才、鬼才·界限、鬼道、国色   
 ]]--
 --[[
 	刚烈
@@ -47,6 +47,69 @@ Luaganglie = sgs.CreateTriggerSkill{
 	end,
 }
 
+--[[
+	攻心
+	相关武将：身份-神·吕蒙
+	描述：出牌阶段限一次，你可观看一名其他角色的手牌并可展示其中的一张♥牌，然后选择一项：1.弃置之；2.将之置于牌堆顶。
+	引用：
+	状态：1.2.1验证通过
+]]
+
+LuaGongxinCard = sgs.CreateSkillCard{
+	name = "LuaGongxinCard",
+	skill_name = "LuaGongxin",
+	target_fixed = false,
+	will_throw = false,
+	handling_method = sgs.Card_MethodNone,
+
+	filter = function(self, targets, to_select, player)
+		return #targets == 0 and to_select:objectName() ~= player:objectName() and not to_select:isKongcheng()
+	end ,
+
+	feasible = function(self, targets, player)
+		return #targets == 1
+	end,
+
+	on_effect = function(self, effect)
+		local room = effect.from:getRoom()
+		if not effect.to:isKongcheng() then
+			local ids = sgs.IntList()
+			for _, card in sgs.qlist(effect.to:getHandcards()) do
+				if card:getSuit() == sgs.Card_Heart then
+					ids:append(card:getEffectiveId())
+				end
+			end
+			local card_id = room:doGongxin(effect.from, effect.to, ids, self:getSkillName())
+			if card_id == -1 then return end
+			local result = room:askForChoice(effect.from, self:getSkillName(), "discard+put")
+			effect.from:removeTag(self:getSkillName())
+			if result == "discard" then
+				local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_DISMANTLE, effect.from:objectName(), nil, self:getSkillName(), nil)
+				room:throwCard(sgs.Sanguosha:getCard(card_id), reason, effect.to, effect.from)
+			else
+				effect.from:setFlags("Global_GongxinOperator")
+				local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PUT, effect.from:objectName(), nil, self:getSkillName(), nil)
+				room:moveCardTo(sgs.Sanguosha:getCard(card_id), effect.to, nil, sgs.Player_DrawPile, reason, true)
+				effect.from:setFlags("-Global_GongxinOperator")
+			end
+		end
+	end,
+}
+
+LuaGongxin = sgs.CreateZeroCardViewAsSkill{   
+	name = "LuaGongxin",
+
+	view_as = function(self)
+		local skillcard = LuaGongxinCard:clone()
+		skillcard:setSkillName(self:objectName())
+		skillcard:setShowSkill(self:objectName())
+		return skillcard
+	end,
+
+	enabled_at_play = function(self, player)
+		return not player:hasUsed("#LuaGongxinCard")
+	end, 
+}
 
 --[[
 	固政
