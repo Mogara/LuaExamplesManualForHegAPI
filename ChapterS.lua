@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（S区）
 	技能索引：
-	尚义、神速、慎行、神智、生息、守成、授钺、淑慎、双刃、双雄、死谏、随势  
+	尚义、涉猎、神速、慎行、神智、生息、守成、授钺、淑慎、双刃、双雄、死谏、随势  
 ]]--
 --[[
 	尚义
@@ -10,6 +10,67 @@
 	引用：
 	状态：
 ]]
+
+--[[
+	涉猎
+	相关武将：身份-神·吕蒙
+	描述：摸牌阶段开始时，你可放弃摸牌，亮出牌堆顶的五张牌，然后获得其中每种花色的牌各一张，将其余的牌置入弃牌堆。 
+	引用：
+	状态：1.2.1验证通过
+]]
+
+LuaShelie = sgs.CreateTriggerSkill{
+	name = "LuaShelie",
+	can_preshow = true,
+	frequency = sgs.Skill_NotFrequent,
+	events = sgs.EventPhaseStart,
+
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Draw) then return "" end
+		return self:objectName()
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if ask_who:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), ask_who)
+			return true 
+		end
+	end,
+
+	on_effect = function(self, event, room, player, data)
+		local card_ids = room:getNCards(5)
+		room:fillAG(card_ids)
+		local to_get, to_throw = sgs.IntList(), sgs.IntList()
+		while to_get:length() + to_throw:length() ~= 5 do
+			local id = room:askForAG(player, card_ids, false, self:objectName())
+			room:takeAG(player, id, false)
+			to_get:append(id)
+			local suit = sgs.Sanguosha:getCard(id):getSuit()
+			for _, id2 in sgs.qlist(card_ids) do
+				if id ~= id2 and sgs.Sanguosha:getCard(id2):getSuit() == suit then
+					room:takeAG(nil, id2, false)
+					to_throw:append(id2)
+				end
+			end
+		end
+		room:clearAG()
+		local dummy = sgs.Sanguosha:cloneCard("jink")
+		dummy:deleteLater()
+		if not to_get:isEmpty() then
+			dummy:addSubcards(to_get)
+			player:obtainCard(dummy)
+		end
+		dummy:clearSubcards()
+		if not to_throw:isEmpty() then
+			dummy:addSubcards(to_throw)
+			local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_NATURAL_ENTER, player:objectName(), self:objectName(), "")
+			room:throwCard(dummy, reason, nil)
+		end
+		
+		return true
+	end
+}
+
 --[[
 	神速
 	相关武将：标-夏侯渊
