@@ -918,6 +918,7 @@ LuaLuoying = sgs.CreateTriggerSkill{
 
 			if move.to_place == sgs.Player_DiscardPile and (jud or (dis and move.from_places:contains(sgs.Player_PlaceTable))) then	
 				for _, idstring in ipairs(luoyingCards_string:split("+")) do
+					if not move.card_ids:contains(tonumber(idstring)) then return "" end			
 					if room:getCardPlace(tonumber(idstring)) == sgs.Player_DiscardPile then table.insert(luoying_ids, idstring) end
 				end
 				room:setPlayerProperty(player, "luoying_toget", sgs.QVariant(table.concat(luoying_ids, "+")))
