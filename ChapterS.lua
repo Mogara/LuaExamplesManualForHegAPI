@@ -17,7 +17,21 @@
 	描述：摸牌阶段开始时，你可放弃摸牌，亮出牌堆顶的五张牌，然后获得其中每种花色的牌各一张，将其余的牌置入弃牌堆。 
 	引用：
 	状态：1.2.1验证通过
+	相关翻译{
+		["LuaShelie#up"] = "置入弃牌堆",
+		["LuaShelie#down"] = "获得",
+		["@LuaShelie"] = "请选择花色各不同的卡牌",
+	}
 ]]
+
+function LuaShelieAsMovePattern(selected, to_select)
+	for _, id in ipairs(selected) do
+		if sgs.Sanguosha:getCard(to_select):getSuit() == sgs.Sanguosha:getCard(id):getSuit() then
+			return false
+		end
+	end
+	return true
+end
 
 LuaShelie = sgs.CreateTriggerSkill{
 	name = "LuaShelie",
@@ -31,42 +45,30 @@ LuaShelie = sgs.CreateTriggerSkill{
 	end,
 	
 	on_cost = function(self, event, room, player, data)
-		if ask_who:askForSkillInvoke(self:objectName(), data) then
-			room:broadcastSkillInvoke(self:objectName(), ask_who)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
 			return true 
 		end
 	end,
 
 	on_effect = function(self, event, room, player, data)
-		local card_ids = room:getNCards(5)
-		room:fillAG(card_ids)
-		local to_get, to_throw = sgs.IntList(), sgs.IntList()
-		while to_get:length() + to_throw:length() ~= 5 do
-			local id = room:askForAG(player, card_ids, false, self:objectName())
-			room:takeAG(player, id, false)
-			to_get:append(id)
-			local suit = sgs.Sanguosha:getCard(id):getSuit()
-			for _, id2 in sgs.qlist(card_ids) do
-				if id ~= id2 and sgs.Sanguosha:getCard(id2):getSuit() == suit then
-					room:takeAG(nil, id2, false)
-					to_throw:append(id2)
-				end
-			end
-		end
-		room:clearAG()
+		local card_ids, suits = room:getNCards(5), {}
+		for _, id in sgs.qlist(card_ids) do table.insert(suits, sgs.Sanguosha:getCard(id):getSuit()) end
+		local AsMove = room:askForMoveCards(player, card_ids, sgs.IntList(), true, self:objectName(), "LuaShelieAsMovePattern", self:objectName(), #table.toSet(suits), #table.toSet(suits), false, true)
+
 		local dummy = sgs.Sanguosha:cloneCard("jink")
 		dummy:deleteLater()
-		if not to_get:isEmpty() then
-			dummy:addSubcards(to_get)
+		if not AsMove.bottom:isEmpty() then
+			dummy:addSubcards(AsMove.bottom)
 			player:obtainCard(dummy)
 		end
 		dummy:clearSubcards()
-		if not to_throw:isEmpty() then
-			dummy:addSubcards(to_throw)
+		if not AsMove.top:isEmpty() then
+			dummy:addSubcards(AsMove.top)
 			local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_NATURAL_ENTER, player:objectName(), self:objectName(), "")
 			room:throwCard(dummy, reason, nil)
 		end
-		
+
 		return true
 	end
 }
