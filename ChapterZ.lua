@@ -347,7 +347,12 @@ LuaZiliang = sgs.CreateTriggerSkill{
 	描述：每当你的牌因弃置而置入弃牌堆前，你可以将其中至少一张牌以任意顺序置于牌堆顶。
 	引用：
 	状态：1.2.0 验证通过
-	备注：操作方式改为先点击的牌会置于摸牌堆的上方
+	备注：
+	相关翻译 {
+		["@LuaZongxuan"] = "请选择至少一张牌置于牌堆顶", 
+		["LuaZongxuan#up"] = "弃置",
+		["LuaZongxuan#down"] = "置于牌堆顶",
+	}
 ]]
 
 luazongxuan = sgs.CreateTriggerSkill{
@@ -401,41 +406,33 @@ luazongxuan = sgs.CreateTriggerSkill{
 		table.remove(zongxuanCards_strings)
 		player:setTag("zongxuanCards_strings", sgs.QVariant(table.concat(zongxuanCards_strings, "|")))
 
-		local zongxuanCards = player:property("zongxuan_toget"):toString():split("+")
-		local cards = sgs.IntList()
-		for _, idstring in ipairs(zongxuanCards) do 
-			cards:append(tonumber(idstring))
-		end
-
-		local ids = room:notifyChooseCards(player, cards, self:objectName(), sgs.Player_PlaceTable, sgs.Player_PlaceTable, cards:length(), 0, "@"..self:objectName())
-		if ids:length() > 0 then
-			zongxuanPut = sgs.QList2Table(ids)
-			room:setPlayerProperty(player, "zongxuanPut", sgs.QVariant(table.concat(zongxuanPut, "+")))
-			local log = sgs.LogMessage()
-			log.type = "#InvokeSkill"
-			log.from = player
-			log.arg = self:objectName()
-			room:sendLog(log)
+		if player:askForSkillInvoke(self:objectName(), data) then
 			room:broadcastSkillInvoke(self:objectName(), player)
 			return true
 		end
-
 		return false 
 	end,
 	
 	on_effect = function(self, event, room, player, data)
+		local zongxuanCards = player:property("zongxuan_toget"):toString():split("+")
+		local card_ids, to_top = sgs.IntList(), sgs.IntList()
+		for _, idstring in ipairs(zongxuanCards) do 
+			card_ids:append(tonumber(idstring))
+		end
+
+		local AsMove = room:askForMoveCards(player, card_ids, sgs.IntList(), false, self:objectName(), "", self:objectName(), 1, card_ids:length(), false, false)
+		if AsMove.bottom:isEmpty() then return false end
+
 		local move = data:toMoveOneTime()
-		local zongxuanCards = sgs.IntList()
-		local zongxuanPut = player:property("zongxuanPut"):toString():split("+")
-		for i = #zongxuanPut, 1, -1 do
-			local id = tonumber(zongxuanPut[i])
-			zongxuanCards:append(id)
+		for _, id in sgs.qlist(AsMove.bottom) do
+			to_top:prepend(id)
 			move.from_places:removeAt(move.card_ids:indexOf(id))
 			move.card_ids:removeOne(id)
 		end
 		data:setValue(move)
+		
 		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PUT, player:objectName(), self:objectName(), "")
-		local move = sgs.CardsMoveStruct(zongxuanCards, player, nil, sgs.Player_PlaceTable, sgs.Player_DrawPile, reason)
+		local move = sgs.CardsMoveStruct(to_top, player, nil, sgs.Player_PlaceTable, sgs.Player_DrawPile, reason)
 		local moves = sgs.CardsMoveList()
 		moves:append(move)
 		room:moveCardsAtomic(moves, false)
