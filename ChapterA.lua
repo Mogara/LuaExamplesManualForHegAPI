@@ -113,6 +113,11 @@ LuaAnxu = sgs.CreateZeroCardViewAsSkill{
 	引用：
 	状态：1.2.0 测试通过
 	备注：修改成类似OL的操作方式
+	相关翻译 {
+		["#LuaAocai"] = "傲才",
+		["@LuaAocai"] = "傲才：你可以使用或打出牌堆顶一张牌",
+		["$LuaAocaiUse"] = "%from %arg 选择了牌堆顶的第 %arg2 张牌 %card",
+	}
 ]]
 
 local LuaAocaiView = function(self, room, player, pattern)
@@ -229,5 +234,18 @@ LuaAocai = sgs.CreateZeroCardViewAsSkill{
 			end
 		end
 		return false
+	end,
+}
+
+--临时解决下因为戳取消不触发ChoiceMade而导致的有人濒死结算后傲才不可用的BUG（貌似所有版本傲才都有？），要用的话直接改为添加LuaAocai_Fixed就行
+LuaAocai_Fixed = sgs.CreateTriggerSkill{
+	name = "LuaAocai",
+	events = sgs.AskForPeachesDone,
+	view_as_skill = LuaAocai,
+	
+	on_record = function(self, event, room, player, data)
+		for _, p in sgs.qlist(room:getAlivePlayers()) do
+			if p:hasFlag("Global_LuaAocaiFailed") then room:setPlayerFlag(p, "-Global_LuaAocaiFailed") end
+		end 
 	end,
 }
