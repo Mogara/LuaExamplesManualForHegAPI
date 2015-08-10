@@ -150,9 +150,161 @@ LuaLijian = sgs.CreateOneCardViewAsSkill{
 	相关武将：标-孔融
 	描述：每当你的一张被弃置的牌置入弃牌堆后，你可以将之交给一名其他角色。  
 	引用：
-	状态：
+	状态：国战 2.0 验证通过
+	相关翻译 {
+		["@LuaLirang-distribute1"] = "礼让：你须将至少 1 张牌任意分配给其他角色",
+		["@LuaLirang-distribute2"] = "礼让：你可将至多 %arg 张牌任意分配给其他角色",
+		["~LuaLirang"] = "选择任意礼让牌和一名其他角色→点击确定",
+		["#LuaLirang"] = "礼让",
+	}
 ]]
 
+LuaLirangCard = sgs.CreateSkillCard{
+	name = "LuaLirangCard",
+	skill_name = "LuaLirang",
+	will_throw = false,
+	handling_method = sgs.Card_MethodNone,
+
+	on_use = function(self, room, source, targets)
+		local data = sgs.QVariant()
+		data:setValue(targets[1])
+		source:setTag("LuaLirang_target", data)
+	end,
+}
+
+LuaLirangVS = sgs.CreateViewAsSkill{   
+	name = "LuaLirang",
+	expand_pile = "#LuaLirang",
+	
+	view_filter = function(self, selected, to_select)
+		return sgs.Self:getPile("#LuaLirang"):contains(to_select:getId())
+	end, 
+
+	view_as = function(self, originalCards) 
+		if #originalCards > 0 then
+			local skillcard = LuaLirangCard:clone()
+			for _, card in ipairs(originalCards) do
+				skillcard:addSubcard(card)
+			end
+			return skillcard
+		end
+	end, 
+
+	enabled_at_play = function(self, player)
+		return false
+	end,
+
+	enabled_at_response = function(self, player, pattern)
+		return pattern:startsWith("@@LuaLirang")
+	end,
+}
+
+LuaLirang = sgs.CreateTriggerSkill{
+	name = "LuaLirang",
+	can_preshow = true,
+	events = sgs.CardsMoveOneTime,
+	view_as_skill = LuaLirangVS,
+	
+	on_record = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return end
+		if not player:hasSkill(self:objectName()) then player:removeTag("luoyingCards_strings") return end
+
+		local move = data:toMoveOneTime()
+		if not move.from or move.from:objectName() ~= player:objectName() then return false end
+		if bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
+			if move.to_place == sgs.Player_PlaceTable then
+				local lirang_card = {}
+				for i = 0, move.card_ids:length() - 1, 1 do
+					local card_id = move.card_ids:at(i)
+					if room:getCardPlace(card_id) == sgs.Player_PlaceTable
+						and (move.from_places:at(i) == sgs.Player_PlaceHand or move.from_places:at(i) == sgs.Player_PlaceEquip) then
+						table.insert(lirang_card, card_id)
+					end
+				end
+				if #lirang_card > 0 then
+					local lirang_strings = player:getTag("LuaLirang_strings"):toString()
+					lirang_strings = lirang_strings .. "|" .. table.concat(lirang_card, "+")
+					player:setTag("LuaLirang_strings", sgs.QVariant(lirang_strings))
+				end
+			end
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName())) then return "" end
+
+		local move = data:toMoveOneTime()
+		if not move.from or move.from:objectName() ~= player:objectName() then return false end
+
+		if bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
+			if move.from_places:contains(sgs.Player_PlaceTable) and move.to_place == sgs.Player_DiscardPile then
+				local lirang_strings = player:getTag("LuaLirang_strings"):toString():split("|")
+				local lirang_card = lirang_strings[#lirang_strings]:split("+")
+				
+				local lirang_give = {}
+				for _, id in sgs.qlist(move.card_ids) do
+					if not table.contains(lirang_card, tostring(id)) then return "" end
+				end
+				for _, id in ipairs(lirang_card) do
+					if room:getCardPlace(id) == sgs.Player_DiscardPile then table.insert(lirang_give, id) end
+				end
+
+				player:setTag("LuaLirang_give", sgs.QVariant(table.concat(lirang_give, "+")))
+				if #lirang_give > 0 then return self:objectName() end
+			end
+		end
+
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local lirang_strings_list = player:getTag("LuaLirang_strings"):toString():split("|");
+		table.remove(lirang_strings_list)
+		player:setTag("LuaLirang_strings", sgs.QVariant(table.concat(lirang_strings_list, "|")))
+
+		if player:askForSkillInvoke(self:objectName()) then
+			local lirang_gives = player:getTag("LuaLirang_gives"):toString()
+			lirang_gives = lirang_gives .. "|" .. player:getTag("LuaLirang_give"):toString()
+			player:setTag("LuaLirang_gives", sgs.QVariant(lirang_gives))
+			return true
+		end
+
+		return false
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local lirang_gives = player:getTag("LuaLirang_gives"):toString():split("|")
+		local lirang_give = sgs.IntList()
+		for _, id in ipairs(lirang_gives[#lirang_gives]:split("+")) do
+			lirang_give:append(tonumber(id))
+		end
+		table.remove(lirang_gives)
+		player:setTag("LuaLirang_gives", sgs.QVariant(table.concat(lirang_gives, "|")))
+
+		local pattern, prompt = "@@LuaLirang!", "@LuaLirang-distribute1:::"
+		repeat
+			room:notifyMoveToPile(player, lirang_give, "LuaLirang", sgs.Player_DiscardPile, true, true)
+			local card = room:askForUseCard(player, pattern, prompt .. lirang_give:length(), -1, sgs.Card_MethodNone)
+			room:notifyMoveToPile(player, lirang_give, "LuaLirang", sgs.Player_DiscardPile, false, false)
+			if not card or card:getSubcards():length() == 0 then break end
+			for _, id in sgs.qlist(card:getSubcards()) do
+				lirang_give:removeOne(id)
+			end
+			local dummy = sgs.Sanguosha:cloneCard("jink")
+			dummy:deleteLater()
+			dummy:addSubcards(card:getSubcards())
+			local target = player:getTag("LuaLirang_target"):toPlayer()
+			local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PREVIEWGIVE, player:objectName(), target:objectName(), "LuaLirang", "LuaLirang")
+			room:obtainCard(target, dummy, reason, true)
+			pattern = "@@LuaLirang"
+			prompt = "@LuaLirang-distribute2:::"
+		until lirang_give:isEmpty() or not player:isAlive()
+		
+		return false
+	end,
+}
+
+--[[ 这是以前的askForYiji版
 LuaLirang = sgs.CreateTriggerSkill{
 	name = "LuaLirang",
 	events = {sgs.CardsMoveOneTime},
@@ -275,6 +427,7 @@ LuaLirang = sgs.CreateTriggerSkill{
 		end
 	end,
 }
+]]
 
 --[[
 	连环
