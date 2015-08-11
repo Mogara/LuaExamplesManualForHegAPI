@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（J区）
 	技能索引：
-	激昂、急救、急袭、激诏、集智、奸雄、奸雄·界限、节命、结姻、精策、酒诗、据守、巨象  
+	激昂、急救、急袭、激诏、集智、奸雄、奸雄·界限、节命、结姻、解烦·旧、精策、酒诗、据守、巨象  
 ]]--
 --[[
 	激昂
@@ -310,6 +310,118 @@ LuaJieyin = sgs.CreateViewAsSkill{
 		jieyin_card:setSkillName(self:objectName())
         jieyin_card:setShowSkill(self:objectName())
         return jieyin_card
+	end,
+}
+
+--[[
+	解烦
+	相关武将：身份-韩当（怀旧）
+	描述：你的回合外，当一名角色处于濒死状态时，你可以对当前正进行回合的角色使用【杀】（无距离限制），此【杀】造成伤害时，你防止此伤害，视为对该濒死角色使用一张【桃】。  
+	引用：LuaNosJieFan
+	状态：与OL结算稍微不同
+]]
+
+local check = function (player,skill)
+	local bool = player and player:isAlive()
+	if skill then
+		return bool and player:hasSkill(skill:objectName())
+	end
+	return bool
+end
+
+LuaNosJieFan = sgs.CreateTriggerSkill{
+	name = "LuaNosJieFan",
+	events = {sgs.DamageCaused, sgs.CardFinished, sgs.AskForPeaches, sgs.PreCardUsed},
+	on_record = function(self, event, room, player, data)
+		if check(player,self) then
+			if event == sgs.CardFinished then
+				local use = data:toCardUse()
+				if use.card:isKindOf("Slash") and use.card:hasFlag("LuaJieFanSlash") then
+					room:setCardFlag(use.card,"-LuaJieFanSlash")
+				end
+			elseif event == sgs.PreCardUsed and player:hasFlag("inLuaJieFanMode") then
+				local use = data:toCardUse()
+				if use.card:isKindOf("Slash") then
+					room:setCardFlag(use.card,"LuaJieFanSlash")
+					room:setPlayerFlag(player,"-inLuaJieFanMode")
+					use.from:showGeneral(use.from:inHeadSkills(self:objectName()))
+				end
+			end
+		end
+	end,
+	can_trigger = function(self, event, room, player, data)
+		if check(player,self) then
+			if event == sgs.AskForPeaches then
+				local invokable = nil
+				for _,p in sgs.qlist(room:getOtherPlayers(player)) do
+					if p:getPhase() ~= sgs.Player_NotActive then
+						invokable = p
+						break
+					end
+				end
+				if check(invokable) then
+					local target = room:getCurrentDyingPlayer()
+					if check(target) then
+						return self:objectName() .. "->" .. target:objectName(),player
+					end
+				end
+			elseif event == sgs.DamageCaused then
+				local damage = data:toDamage()
+				local target = room:getCurrentDyingPlayer()
+				if check(target) then
+					if damage.card:isKindOf("Slash") and damage.card:hasFlag("LuaJieFanSlash") then
+						return self:objectName() .. "->" .. target:objectName(),player
+					end
+				end
+			end
+		end
+	end,
+	on_cost = function(self, event, room, dying, data, source)
+		if event == sgs.AskForPeaches then
+			local target = room:getCurrent()
+			room:setPlayerFlag(source,"inLuaJieFanMode")
+			local slash = room:askForUseSlashTo(source,target,"LuaNosJieFan-slash:"..target:objectName()..":"..dying:objectName(),false)
+			if slash == nil then
+				room:setPlayerFlag(source,"-inLuaJieFanMode")
+			end
+		elseif event == sgs.DamageCaused then
+			damage = data:toDamage()
+			return  damage.card:isKindOf("Slash") and damage.card:hasFlag("LuaJieFanSlash")
+		end
+	end,
+	on_effect = function(self, event, room, target, data, source)
+		if event ~= sgs.DamageCaused then return false end
+		local damage = data:toDamage()
+		if damage.card:isKindOf("Slash") and damage.card:hasFlag("LuaJieFanSlash") then
+			room:setCardFlag(damage.card,"-LuaJieFanSlash")
+			local log2 = sgs.LogMessage()
+			log2.type = "#LuaNosJieFanPrevent"
+			log2.from = source
+			log2.to:append(damage.to)
+			room:sendLog(log2)
+			if target and target:getHp() > 0 then
+				local log = sgs.LogMessage()
+				log.type = "#LuaNosJieFanNull1"
+				log.from = target
+				room:sendLog(log)
+			elseif target and target:isDead() then
+				local log = sgs.LogMessage()
+				log.type = "#LuaNosJieFanNull2"
+				log.from = target					
+				room:sendLog(log)
+			elseif room:getCurrent():hasShownSkill("wansha") and target:objectName() ~= source:objectName() then
+				local log = sgs.LogMessage()
+				log.type = "#LuaNosJieFanNull3"
+				log.from = room:getCurrent()
+				log.to:append(source)
+				room:sendLog(log)
+			else
+				local peach = sgs.Sanguosha:cloneCard("peach",sgs.Card_NoSuit,0)
+				peach:setSkillName(self:objectName())
+				room:useCard(sgs.CardUseStruct(peach,source,target))
+			end
+			return true
+		end
 	end,
 }
 
