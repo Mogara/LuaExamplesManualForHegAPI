@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（Q区）
 	技能索引：
-	奇才、戚乱、奇袭、千幻、潜袭、谦逊、强袭、琴音、倾城、倾国、青囊、巧变、驱虎    
+	奇才、奇策、戚乱、奇袭、千幻、潜袭、谦逊、强袭、琴音、倾城、倾国、青囊、巧变、驱虎    
 ]]--
 --[[
 	奇才
@@ -21,6 +21,31 @@ LuaQicai = sgs.CreateTargetModSkill{
 		else
 			return 0
 		end
+	end,
+}
+
+--[[
+	奇策
+	相关武将：身份-荀攸
+	描述：出牌阶段限一次，你可将所有手牌（至少一张）当做任意一张非延迟锦囊牌使用。
+	适用：2.0以后版本（每夜版20150812及以后）
+]]
+
+LuaQice = sgs.CreateZeroCardViewAsSkill{   
+	name = "LuaQice",
+	guhuo_type = "t",
+	
+	view_as = function(self)
+		local card = sgs.Sanguosha:cloneCard(sgs.Self:getTag(self:objectName()):toString(), sgs.Card_SuitToBeDecided, -1)
+		card:addSubcards(sgs.Self:getHandcards())
+		card:setSkillName(self:objectName())
+		card:setShowSkill(self:objectName())
+		card:setCanRecast(false)
+		return card
+	end,
+
+	enabled_at_play = function(self, player)
+		return not player:isKongcheng() and player:usedTimes("ViewAsSkill_LuaQiceCard") == 0
 	end,
 }
 
