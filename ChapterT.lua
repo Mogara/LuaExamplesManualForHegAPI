@@ -1,8 +1,157 @@
 --[[
 	国战技能速查手册（T区）
 	技能索引：
-	天妒、天覆、天香、天义、挑衅、铁骑、突袭、屯田  
+	讨袭、 天妒、天覆、天香、天义、挑衅、铁骑、突袭、屯田  
 ]]--
+
+--[[
+	讨袭
+	相关武将：身份-一将成名2015-曹休
+	描述：出牌阶段限一次，当你使用的牌仅指定一名其他角色为目标，你可展示其一张手牌，并可以将此牌如手牌般使用或打出，直到回合结束。若回合结束时其未失去此牌，你失去一点体力。 
+	引用：
+	状态：2.0
+]]
+
+LuaTaoxiVS = sgs.CreateZeroCardViewAsSkill{
+	name = "LuaTaoxi",
+	view_as = function(self)
+		local card = sgs.Sanguosha:getCard(sgs.Self:getMark("taoxi_card"))
+		card:setSkillName(self:objectName())
+		return card
+	end,
+	enabled_at_play = function(self)
+		return false
+	end,
+	enabled_at_nullification = function(self, player)
+		local card = sgs.Sanguosha:getCard(player:getMark("taoxi_card"))
+		if card:isKindOf("Nullification") and card:hasFlag("taoxi_card") then
+			return true
+		end
+	end,
+}
+
+local json = require ("json")
+LuaTaoxi = sgs.CreateTriggerSkill{
+	name = "LuaTaoxi",
+	events = {sgs.BeforeCardsMove, sgs.EventPhaseChanging, sgs.TargetChosen, sgs.PreCardUsed},
+	view_as_skill = LuaTaoxiVS,
+	can_trigger = function(self,event,room,player,data)
+		if event == sgs.BeforeCardsMove then
+			local move = data:toMoveOneTime()
+			if player:hasFlag("taoxi_invoke") then
+				for _, id in sgs.qlist(move.card_ids) do
+					if sgs.Sanguosha:getCard(id):hasFlag("taoxi_card") then
+						local ids = sgs.IntList()
+						ids:append(id)
+						local move = sgs.CardsMoveStruct(ids, player, nil, sgs.Player_PlaceSpecial, sgs.Player_PlaceTable,
+							sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_UNKNOWN, player:objectName()))
+						move.from_pile_name = "^" .. self:objectName()
+						local moves = sgs.CardsMoveList()
+						local _player = sgs.SPlayerList()
+						_player:append(player)
+						moves:append(move)
+						room:setPlayerFlag(player, "Global_InTempMoving")
+						room:notifyMoveCards(true,moves,false,_player)
+						room:notifyMoveCards(false,moves,false,_player)
+						room:setPlayerFlag(player, "-Global_InTempMoving")
+
+						room:clearCardFlag(id)
+						room:removePlayerMark(player, "taoxi_card")
+						player:setFlags("-taoxi_invoke")
+					end
+				end
+			end
+		elseif event == sgs.TargetChosen then
+			if not player or player:isDead() or not player:hasSkill(self:objectName()) then return false end
+			local use = data:toCardUse()
+			if not player:hasUsed(self:objectName()) and use.to:length() == 1 and not use.to:first():isKongcheng()
+				and not use.to:contains(player) and player:getPhase() == sgs.Player_Play
+				and use.card:getTypeId() ~= sgs.Card_TypeSkill then
+				return self:objectName()
+			end
+		elseif event == sgs.EventPhaseChanging then
+			local change = data:toPhaseChange()
+			if change.to == sgs.Player_NotActive and player:hasFlag("taoxi_invoke") then
+				local ids = sgs.IntList()
+				ids:append(player:getMark("taoxi_card"))
+
+				local jsonValue = {
+					room:getCardOwner(player:getMark("taoxi_card")):objectName(),
+					{"-" .. tostring(player:getMark("taoxi_card"))},
+				}
+				room:doNotify(player, sgs.CommandType.S_COMMAND_SET_VISIBLE_CARDS, json.encode(jsonValue))
+
+				local move = sgs.CardsMoveStruct(ids, player, nil, sgs.Player_PlaceSpecial, sgs.Player_PlaceTable,
+					sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_UNKNOWN, player:objectName()))
+				move.from_pile_name = "^" .. self:objectName()
+				local moves = sgs.CardsMoveList()
+				local _player = sgs.SPlayerList()
+				_player:append(player)
+				moves:append(move)
+				room:setPlayerFlag(player, "Global_InTempMoving")
+				room:notifyMoveCards(true,moves,false,_player)
+				room:notifyMoveCards(false,moves,false,_player)
+				room:setPlayerFlag(player, "-Global_InTempMoving")
+
+				room:clearCardFlag(player:getMark("taoxi_card"))
+				room:removePlayerMark(player, "taoxi_card")
+				room:loseHp(player)
+			end
+		elseif event == sgs.PreCardUsed then
+			local use = data:toCardUse()
+			if player:hasFlag("taoxi_invoke") and use.card:hasFlag("taoxi_card") and use.card:isKindOf("DelayedTrick") then
+				return self:objectName()
+			end	
+		end
+	end,
+	on_cost = function(self,event,room,player,data)
+		if player:hasFlag("taoxi_invoke") then return true end
+		local use = data:toCardUse()
+		local d = sgs.QVariant()
+		d:setValue(use.to:first())
+		return player:askForSkillInvoke(self:objectName(), d)
+	end,
+	on_effect = function(self,event,room,player,data)
+		local use = data:toCardUse()
+		if event == sgs.PreCardUsed then
+			local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_LETUSE, player:objectName(), self:objectName(), "")
+            room:moveCardTo(use.card, player, sgs.Player_PlaceTable, reason, true)
+		else
+			if not use.to:first():isKongcheng() then
+				room:addPlayerHistory(player, self:objectName())
+				local id = room:askForCardChosen(player, use.to:first(), "h", self:objectName())
+				if id ~= -1 then
+					room:showCard(use.to:first(), id)
+					room:getThread():delay()
+					room:setPlayerMark(player, "taoxi_card", id)
+					player:setFlags("taoxi_invoke")
+					room:setCardFlag(id, "taoxi_card")
+
+					local jsonValue = {
+						use.to:first():objectName(),
+						{tostring(id)},
+					}
+					room:doNotify(player, sgs.CommandType.S_COMMAND_SET_VISIBLE_CARDS, json.encode(jsonValue))
+
+					room:setPlayerFlag(player,"Global_InTempMoving")
+					local ids = sgs.IntList()
+					ids:append(id)
+					local move = sgs.CardsMoveStruct(ids, nil, player, sgs.Player_PlaceTable, sgs.Player_PlaceSpecial,
+						sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_UNKNOWN, player:objectName()))
+					move.to_pile_name = "^" .. self:objectName()
+					local moves = sgs.CardsMoveList()
+					moves:append(move)
+					local _player = sgs.SPlayerList()
+					_player:append(player)
+					room:notifyMoveCards(true,moves,true,_player)
+					room:notifyMoveCards(false,moves,true,_player)
+					room:setPlayerFlag(player,"-Global_InTempMoving")
+				end
+			end
+		end
+	end,
+}
+
 --[[
 	天妒
 	相关武将：标-郭嘉
