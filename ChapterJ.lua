@@ -433,17 +433,17 @@ LuaNosJieFan = sgs.CreateTriggerSkill{
 	状态：
 ]]
 
-luajingce = sgs.CreateTriggerSkill{
-	name = "luajingce",
+LuaJingce = sgs.CreateTriggerSkill{
+	name = "LuaJingce",
 	can_preshow = true,
 	frequency = sgs.Skill_Frequent,
-	events = {sgs.EventPhaseEnd, sgs.PreCardUsed},
+	events = {sgs.EventPhaseEnd, sgs.PreCardUsed, sgs.CardResponded},
 
 	on_record = function(self, event, room, player, data)
 		if not (player and player:isAlive()) then return end
-		if event == sgs.PreCardUsed then
+		if event == sgs.PreCardUsed or event == sgs.CardResponded then
 			local card
-			if event == sgs.PreCardUsed or event == sgs.CardUsed then
+			if event == sgs.PreCardUsed then
 				card = data:toCardUse().card
 			elseif event == sgs.CardResponded then
 				local response = data:toCardResponse()
