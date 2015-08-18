@@ -364,7 +364,7 @@ LuaHuaiyiCard = sgs.CreateSkillCard{
 			local move = sgs.CardsMoveStruct(id, source, sgs.Player_PlaceHand, reason)
 			moves:append(move)
 		end
-		room:moveCardsAtomic(moves, true)
+		room:moveCardsAtomic(moves, false)
 		if source:isAlive() and moves:length() >= 2 then room:loseHp(source) end
 	end,
 }
