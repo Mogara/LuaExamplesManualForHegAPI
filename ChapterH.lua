@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（H区）
 	技能索引：
-	好施、鹤翼、横江、横征、弘法、红颜、护援、魂殇、火计、祸首、祸水      
+	好施、鹤翼、横江、横征、弘法、红颜、护援、怀异、魂殇、火计、祸首、祸水      
 ]]--
 --[[
 	好施
@@ -312,6 +312,79 @@ LuaHongyan = sgs.CreateTriggerSkill{
 	引用：
 	状态：
 ]]
+
+--[[
+	怀异
+	相关武将：身份-公孙渊
+	描述：出牌阶段限一次，你可展示所有手牌，若其中不止一种颜色，你弃置其中一种颜色所有手牌，然后获得至多X名角色各一张牌（X为你以此法弃置的手牌数）；若你以此法获得的牌不少于两张，你失去一点体力。 
+	引用：
+	状态：2.0
+	相关翻译 {
+		["@LuaHuaiyi"] = "你可获得至多 %arg 名其他角色各一张牌",
+	}
+]]
+
+LuaHuaiyiCard = sgs.CreateSkillCard{
+	name = "LuaHuaiyiCard",
+	skill_name = "LuaHuaiyi",
+	target_fixed = true,
+	will_throw = false,
+	handling_method = sgs.Card_MethodNone,
+
+	on_use = function(self, room, source, targets)
+		room:showAllCards(source)
+		local same_color = true
+		for _, card in sgs.qlist(source:getHandcards()) do
+			if not card:sameColorWith(source:getHandcards():first()) then
+				same_color = false
+				break
+			end
+		end
+		if same_color then return false end
+		local choice = room:askForChoice(source, self:getSkillName(), "no_suit_red+no_suit_black")
+		local dummy = sgs.Sanguosha:cloneCard("jink")
+		for _, card in sgs.qlist(source:getHandcards()) do
+			if (choice == "no_suit_red" and card:isRed()) or (choice == "no_suit_black" and card:isBlack()) then
+				dummy:addSubcard(card)
+			end
+		end
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_DISCARD, source:objectName(), self:getSkillName(), "")
+		room:throwCard(dummy, reason, source, nil, self:getSkillName())
+		local to_targets = sgs.SPlayerList()
+		for _, p in sgs.qlist(room:getOtherPlayers(source)) do
+			if not p:isNude() then to_targets:append(p) end
+		end
+		local _targets = room:askForPlayersChosen(source, to_targets, self:getSkillName(), 0, dummy:subcardsLength(), "@"..self:getSkillName()..":::"..dummy:subcardsLength(), true)	
+		dummy:deleteLater()
+
+		local moves = sgs.CardsMoveList()
+		reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_EXTRACTION, source:objectName(), self:getSkillName(), "")
+		for _, p in sgs.qlist(_targets) do
+			local id = room:askForCardChosen(source, p, "he", self:getSkillName())
+			local move = sgs.CardsMoveStruct(id, source, sgs.Player_PlaceHand, reason)
+			moves:append(move)
+		end
+		room:moveCardsAtomic(moves, true)
+		if source:isAlive() and moves:length() >= 2 then room:loseHp(source) end
+	end,
+}
+
+LuaHuaiyi = sgs.CreateZeroCardViewAsSkill{   
+	name = "LuaHuaiyi",
+	
+	view_as = function(self)
+		local skillcard = LuaHuaiyiCard:clone()
+		skillcard:setSkillName(self:objectName())
+		skillcard:setShowSkill(self:objectName())
+		return skillcard
+	end,
+
+	enabled_at_play = function(self, player)
+		return not player:hasUsed("#LuaHuaiyiCard")
+	end,
+}
+
+
 --[[
 	魂殇
 	相关武将：势-孙策
