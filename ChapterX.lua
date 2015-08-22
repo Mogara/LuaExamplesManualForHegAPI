@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（X区）
 	技能索引：
-	享乐、骁果、枭姬、行殇、雄异、眩惑、恂恂
+	享乐、骁果、枭姬、协穆、行殇、雄异、眩惑、恂恂
 ]]--
 --[[
 	享乐
@@ -114,6 +114,79 @@ LuaXiaoji = sgs.CreateTriggerSkill{
 	end,
 	on_effect = function(self,event,room,sunshangxiang,data)
         sunshangxiang:drawCards(2)
+	end,
+}
+
+--[[
+	协穆
+	相关武将：身份-SP·马良
+	描述：出牌阶段限一次，你可以弃置一张【杀】并选择一种势力，若如此做，于你的下回合开始之前，每当你成为该势力其他角色使用的一张黑色牌的目标后，你可以摸两张牌。 
+	引用：
+	状态：2.0
+]]
+
+LuaXiemuCard = sgs.CreateSkillCard{
+	name = "LuaXiemuCard",
+	skill_name = "LuaXiemu",
+	target_fixed = true,
+	will_throw = true,
+
+	on_use = function(self, room, source, targets)
+		local kingdom = room:askForKingdom(source)
+		room:setPlayerMark(source, "@"..self:getSkillName()..kingdom, 1)
+	end,
+}
+
+LuaXiemuVS = sgs.CreateOneCardViewAsSkill{   
+	name = "LuaXiemu",
+	filter_pattern = "Slash|.|.|.",
+
+	view_as = function(self, originalCard)
+		local skillcard = LuaXiemuCard:clone()
+		skillcard:addSubcard(originalCard)
+		skillcard:setSkillName(self:objectName())
+		skillcard:setShowSkill(self:objectName())
+		return skillcard
+	end,
+
+	enabled_at_play = function(self, player)
+		return not player:hasUsed("#LuaXiemuCard")
+	end,
+}
+
+LuaXiemu = sgs.CreateTriggerSkill{
+	name = "LuaXiemu",
+	events = {sgs.EventPhaseStart, sgs.TargetConfirmed},
+	view_as_skill = LuaXiemuVS,
+	
+	on_record = function(self, event, room, player, data)
+		if player and player:isAlive() and event == sgs.EventPhaseStart and player:getPhase() == sgs.Player_RoundStart then
+			for _, kingdom in ipairs(sgs.Sanguosha:getKingdoms()) do
+				room:setPlayerMark(player, "@"..self:objectName()..kingdom, 0)
+			end
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and event == sgs.TargetConfirmed) then return "" end
+		local use = data:toCardUse()
+		if use.from and use.from:objectName() ~= player:objectName() and use.from:hasShownOneGeneral() and player:getMark("@"..self:objectName()..use.from:getKingdom()) > 0 then
+			if use.to:contains(player) and use.card:isBlack() and use.card:getTypeId() ~= sgs.Card_TypeSkill then return self:objectName() end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		player:drawCards(2, self:objectName())
+		return false 
 	end,
 }
 
