@@ -90,11 +90,11 @@ LuaZaiqi = sgs.CreatePhaseChangeSkill{
 	相关武将：身份-王异
 	描述：当你成为其他角色使用【杀】或非延时类锦囊牌的目标后，你可失去1点体力，令此牌对你无效，然后你弃置其一张牌。 
 	引用：
-	状态：1.2.0 验证通过
+	状态：2.0 验证通过
 ]]
 
-luazhenlie = sgs.CreateTriggerSkill{
-	name = "luazhenlie",
+LuaZhenlie = sgs.CreateTriggerSkill{
+	name = "LuaZhenlie",
 	can_preshow = true,
 	frequency = sgs.Skill_Frequent,
 	events = sgs.TargetConfirmed,
