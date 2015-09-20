@@ -8,12 +8,15 @@
 	慷忾
 	相关武将：身份-SP曹昂
 	描述：一名角色成为【杀】的目标后，若你与其的距离不大于1， 你可摸一张牌，然后你将一张牌正面朝上交给该角色，若此牌为装备牌，其可使用之。    
-	引用：
-	状态：
+	状态：2.0
+	相关翻译{
+		["@LuaKangkai-give"] = "慷忾：请交给 %src 一张牌",
+		["@LuaKangkai-use"] = "慷忾：你可以使用 %arg[%arg2]",
+	}
 ]]
 
-luakangkai = sgs.CreateTriggerSkill{
-	name = "luakangkai",
+LuaKangkai = sgs.CreateTriggerSkill{
+	name = "LuaKangkai",
 	can_preshow = true,
 	frequency = sgs.Skill_Frequent,
 	events = sgs.TargetConfirmed,
@@ -47,14 +50,14 @@ luakangkai = sgs.CreateTriggerSkill{
 	end,
 	
 	on_effect = function(self, event, room, player, data, caoang)
-		caoang:drawCards(1, "luakangkai")
+		caoang:drawCards(1, "LuaKangkai")
 		if caoang:objectName() ~= player:objectName() and not caoang:isNude() then
-			local card = sgs.Sanguosha:getCard(room:askForExchange(caoang, self:objectName(), 1, true, "@luakangkai-give:"..player:objectName(), false):getEffectiveId())
+			local card = sgs.Sanguosha:getCard(room:askForExchange(caoang, self:objectName(), 1, 1, "@LuaKangkai-give:"..player:objectName(), "", ".."):getEffectiveId())
 			local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_GIVE, caoang:objectName(), self:objectName(), "")
 			room:obtainCard(player, card, reason, true)
 			if player:isAlive() and card:getTypeId() == sgs.Card_TypeEquip and room:getCardOwner(card:getEffectiveId()):objectName() == player:objectName() and not player:isLocked(card) then
 				player:setTag("kangkaiSlash", data) --For AI
-				room:askForUseCard(player, card:getEffectiveId(), "@luakangkai-use:::"..card:objectName()..":"..card:getSuitString().."_char\\"..card:getNumberString()..":"..card:getEffectiveId())
+				room:askForUseCard(player, card:getEffectiveId(), "@LuaKangkai-use:::"..card:objectName()..":"..card:getSuitString().."_char\\"..card:getNumberString()..":"..card:getEffectiveId())
 				player:removeTag("kangkaiSlash")
 			end 
 		end
