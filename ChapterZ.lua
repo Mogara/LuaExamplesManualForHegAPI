@@ -225,8 +225,8 @@ LuaZhijian = sgs.CreateOneCardViewAsSkill{
 	状态：1.2.0 验证通过
 ]]
 
-luazhiyan = sgs.CreateTriggerSkill{
-	name = "luazhiyan",
+LuaZhiyan = sgs.CreateTriggerSkill{
+	name = "LuaZhiyan",
 	can_preshow = true,
 	frequency = sgs.Skill_Frequent,
 	events = sgs.EventPhaseStart,
@@ -355,8 +355,8 @@ LuaZiliang = sgs.CreateTriggerSkill{
 	}
 ]]
 
-luazongxuan = sgs.CreateTriggerSkill{
-	name = "luazongxuan",
+LuaZongxuan = sgs.CreateTriggerSkill{
+	name = "LuaZongxuan",
 	can_preshow = true,
 	events = sgs.BeforeCardsMove,
 
