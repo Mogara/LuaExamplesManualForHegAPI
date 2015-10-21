@@ -250,57 +250,18 @@ LuaBiyue = sgs.CreatePhaseChangeSkill{
 --[[
 	秉一
 	相关武将：身份-顾雍
-	描述：结束阶段开始时，你可以展示所有手牌，若颜色均相同，你令至多X名角色各摸一张牌（X为你的手牌数）。
+	描述：结束阶段开始时，你可以选择至多X名角色（X为你的手牌数）并展示所有手牌，若颜色均相同，则这些角色各摸一张牌。。
 	引用：
-	状态：1.2.0 验证通过
+	状态：2.0 
+	相关翻译 {
+		["LuaBingyi-Ask"] = "你可以发动 “秉壹” <br/>操作提示：选择至多%arg名角色→确定",
+	}
 ]]
 
-luabingyiCard = sgs.CreateSkillCard{
-	name = "luabingyiCard",
-	skill_name = "luabingyi",
-	target_fixed = false,
-	will_throw = true,
-
-	filter = function(self, targets, to_select, player)
-		for _, card in sgs.qlist(player:getHandcards()) do
-			if card:getColor() ~= player:getHandcards():first():getColor() then return false end
-		end
-		return #targets < player:getHandcardNum()
-	end,
-
-	feasible = function(self, targets)
-		return true
-	end,
-
-	on_use = function(self, room, source, targets)
-		room:showAllCards(source)
-		for _, p in ipairs(targets) do 
-			room:drawCards(p, 1, "luabingyi")
-		end
-	end,
-}
-
-luabingyiVS = sgs.CreateZeroCardViewAsSkill{   
-	name = "luabingyi",
-	response_pattern = "@@luabingyi",
-
-	view_as = function(self)
-		local skillcard = luabingyiCard:clone()
-		skillcard:setSkillName(self:objectName())
-		skillcard:setShowSkill(self:objectName())
-		return skillcard
-	end,
-
-	enabled_at_play = function(self, player)
-		return false
-	end, 
-}
-
-luabingyi = sgs.CreateTriggerSkill{
-	name = "luabingyi",
+LuaBingyi = sgs.CreateTriggerSkill{
+	name = "LuaBingyi",
 	can_preshow = true,
 	events = sgs.EventPhaseStart,
-	view_as_skill = luabingyiVS,
 	
 	can_trigger = function(self, event, room, player, data)
 		if not (player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Finish) or player:isKongcheng() then return "" end
@@ -308,7 +269,13 @@ luabingyi = sgs.CreateTriggerSkill{
 	end,
 	
 	on_cost = function(self, event, room, player, data)
-		if room:askForUseCard(player, "@@luabingyi", "@bingyi-card:::"..player:getHandcardNum()) then
+		local choosees = room:askForPlayersChosen(player, room:getAlivePlayers(), self:objectName(), 0, player:getHandcardNum(), self:objectName().."-Ask:::"..player:getHandcardNum(), true)
+		if choosees:length() > 0 then
+			local targets = {}
+			for _, p in sgs.qlist(choosees) do
+				table.insert(targets, p:objectName())
+			end
+			player:setTag(self:objectName(), sgs.QVariant(table.concat(targets, "|")))
 			room:broadcastSkillInvoke(self:objectName(), player)
 			return true 
 		end
@@ -316,10 +283,19 @@ luabingyi = sgs.CreateTriggerSkill{
 	end,
 	
 	on_effect = function(self, event, room, player, data)
+		local targets = player:getTag(self:objectName()):toString():split("|")
+		room:showAllCards(player)
+		for _, card in sgs.qlist(player:getHandcards()) do
+			if card:getColor() ~= player:getHandcards():first():getColor() then return false end
+		end
+		for _, p in sgs.qlist(room:getAllPlayers()) do
+			if table.contains(targets, p:objectName()) and p:isAlive() then
+				room:drawCards(p, 1, self:objectName())
+			end
+		end
 		return false 
 	end,
 }
-
 --[[
 	不屈
 	相关武将：标-周泰
