@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（X区）
 	技能索引：
-	享乐、骁果、枭姬、协穆、行殇、雄异、眩惑、恂恂
+	享乐、骁果、枭姬、协穆、行殇、兴学、雄异、眩惑、恂恂
 ]]--
 --[[
 	享乐
@@ -223,6 +223,70 @@ luaXingshang = sgs.CreateTriggerSkill{
 		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_RECYCLE, player:objectName())
 		room:obtainCard(player, dummy, reason, false)
 		return false
+	end,
+}
+
+--[[
+	兴学
+	相关武将：身份-孙休
+	描述：结束阶段开始时，你可以选择至多X名角色（若你：拥有技能“宴诛”，则X为你的体力值；没有技能“宴诛”，则X为你的体力上限），令这些角色依次摸一张牌并将一张牌置于牌堆顶。 
+	引用：
+	状态：2.0
+	相关翻译 {
+		["@LuaXingxue-put"] = "兴学：请将一张牌置于牌堆顶" ,
+		["LuaXingxue-invoke"] = "你可以发动“兴学”。<br/>操作提示：选择至多%arg名角色→确定",
+	}
+]]
+
+LuaXingxue = sgs.CreateTriggerSkill{
+	name = "LuaXingxue",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.EventPhaseStart,
+	
+	on_record = function(self, event, room, player, data)
+
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Finish) then return "" end
+		return self:objectName()
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local num = player:getMaxHp()
+		for _, skill in sgs.qlist(player:getVisibleSkillList()) do
+			if sgs.Sanguosha:translate(skill:objectName()) == "宴诛" then num = player:getHp() end
+		end
+		local choosees = room:askForPlayersChosen(player, room:getAlivePlayers(), self:objectName(), 0, num, self:objectName().."-invoke:::"..player:getHandcardNum(), true)
+		if choosees:length() > 0 then
+			local targets = {}
+			for _, p in sgs.qlist(choosees) do
+				table.insert(targets, p:objectName())
+			end
+			player:setTag(self:objectName(), sgs.QVariant(table.concat(targets, "|")))
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local targets = player:getTag(self:objectName()):toString():split("|")
+		for _, p in sgs.qlist(room:getAllPlayers()) do
+			if table.contains(targets, p:objectName()) and p:isAlive() then
+				room:drawCards(p, 1, self:objectName())
+				if p:isAlive() and not p:isNude() then
+					local card = room:askForExchange(p, self:objectName(), 1, 1, "@"..self:objectName().."-put", "", ".")
+					if not card then continue end
+					local move = sgs.CardsMoveStruct(card:getSubcards():first(), nil, sgs.Player_DrawPile, sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PUT, p:objectName(), self:objectName(), ""))
+					room:setPlayerFlag(p, "Global_GongxinOperator")
+					room:moveCardsAtomic(move, false)
+					room:setPlayerFlag(p, "-Global_GongxinOperator")
+				end
+			end
+		end
+		return false 
 	end,
 }
 
