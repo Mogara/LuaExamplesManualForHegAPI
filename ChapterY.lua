@@ -106,6 +106,57 @@ LuaYanyu = sgs.CreateTriggerSkill{
 }
 
 --[[
+	宴诛
+	相关武将：身份-孙休
+	描述：出牌阶段限一次，你可以令一名有牌的其他角色选择一项：令你获得其装备区里所有的牌，然后你失去技能“宴诛”，直到游戏结束；或弃置一张牌。
+	引用：
+	状态：2.0
+	相关翻译 {
+		["@LuaYanzhu-discard"] = "宴诛：弃置一张牌，或令 %src 获得你装备区所有牌并失去“宴诛”。<br/>提示：若你装备区没有牌，则你必须弃置一张牌" ,
+	}
+]]
+
+LuaYanzhuCard = sgs.CreateSkillCard{
+	name = "LuaYanzhuCard",
+	skill_name = "LuaYanzhu",
+	target_fixed = false,
+	handling_method = sgs.Card_MethodNone,
+
+	filter = function(self, targets, to_select, player)
+		return #targets == 0 and to_select:objectName() ~= player:objectName() and not to_select:isNude()
+	end,
+	
+	feasible = function(self, targets, player)
+		return #targets == 1
+	end,
+
+	on_use = function(self, room, source, targets)
+		if not room:askForDiscard(targets[1], self:getSkillName(), 1, 1, not targets[1]:getEquips():isEmpty(), true, "@"..self:getSkillName().."-discard:"..source:objectName()) then 
+			local dummy = sgs.Sanguosha:cloneCard("jink")
+			dummy:addSubcards(targets[1]:getEquips())
+			room:obtainCard(source, dummy)
+			dummy:deleteLater()
+			room:handleAcquireDetachSkills(source, "-"..self:getSkillName())
+		end
+	end,
+}
+
+LuaYanzhu = sgs.CreateZeroCardViewAsSkill{   
+	name = "LuaYanzhu",
+	
+	view_as = function(self)
+		local skillcard = LuaYanzhuCard:clone()
+		skillcard:setSkillName(self:objectName())
+		skillcard:setShowSkill(self:objectName())
+		return skillcard
+	end,
+
+	enabled_at_play = function(self, player)
+		return not player:hasUsed("#LuaYanzhuCard")
+	end,
+}
+
+--[[
 	业炎
 	相关武将：身份-神·周瑜
 	描述：限定技，出牌阶段，你可选择一项：1．选择一至三名角色，对这些角色各造成1点火焰伤害；2．弃置四张花色各不相同的手牌并选择一至两名角色，失去3点体力，然后对这些角色造成至多共3点火焰伤害（其中一名角色分配的点数须不小于2）。
