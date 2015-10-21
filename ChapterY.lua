@@ -1,8 +1,109 @@
 --[[
 	国战技能速查手册（Y区）
 	技能索引：
-	业炎、疑城、遗计、遗志、英魂、鹰扬、英姿、勇决 
+	燕语、业炎、疑城、遗计、遗志、英魂、鹰扬、英姿、勇决 
 ]]--
+
+--[[
+	燕语
+	相关武将：身份-夏侯氏
+	描述：出牌阶段，你可以重铸【杀】。出牌阶段结束时，若你于此阶段以此法重铸了两张或更多的【杀】，则你可以令一名男性角色摸两张牌。
+	引用：
+	状态：2.0
+	相关翻译 {
+		["LuaYanyu-invoke"] = "燕语：你可令一名男性角色摸两张牌",
+	}
+]]
+
+LuaYanyuCard = sgs.CreateSkillCard{
+	name = "LuaYanyuCard",
+	skill_name = "LuaYanyu",
+	target_fixed = true,
+	will_throw = false,
+	handling_method = sgs.Card_MethodRecast,
+	can_recast = true;
+
+	about_to_use = function(self, room, cardUse)
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_RECAST, cardUse.from:objectName(), self:getSkillName(), "")
+		reason.m_skillName = self:getSkillName()
+		room:moveCardTo(self, cardUse.from, nil, sgs.Player_DiscardPile, reason, true)
+		cardUse.from:broadcastSkillInvoke("@recast")
+
+		local log = sgs.LogMessage()
+		log.type = "#UseCard_Recast"
+		log.from = cardUse.from
+		log.card_str = tostring(cardUse.card:getSubcards():first())
+		room:sendLog(log)
+
+		if cardUse.from:ownSkill(self:showSkill()) and not cardUse.from:hasShownSkill(self:showSkill()) then
+			cardUse.from:showGeneral(cardUse.from:inHeadSkills(self:showSkill()))
+		end
+		cardUse.from:addMark(self:getSkillName())
+		cardUse.from:drawCards(1)
+	end,
+}
+
+LuaYanyuVS = sgs.CreateOneCardViewAsSkill{   
+	name = "LuaYanyu",
+	filter_pattern = "Slash",
+
+	view_as = function(self, originalCard)
+		local skillcard = sgs.Self:isCardLimited(originalCard, sgs.Card_MethodRecast) and nil or LuaYanyuCard:clone()
+		skillcard:addSubcard(originalCard)
+		skillcard:setSkillName(self:objectName())
+		skillcard:setShowSkill(self:objectName())
+		return skillcard
+	end,
+
+	enabled_at_play = function(self, player)
+		local slash = sgs.Sanguosha:cloneCard("slash")
+		slash:deleteLater()
+		return not player:isCardLimited(slash, sgs.Card_MethodRecast)
+	end,
+}
+
+LuaYanyu = sgs.CreateTriggerSkill{
+	name = "LuaYanyu",
+	events = {sgs.EventPhaseEnd, sgs.EventPhaseStart},
+	view_as_skill = LuaYanyuVS,
+
+	on_record = function(self, event, room, player, data)
+		if event == sgs.EventPhaseStart and player:getPhase() == sgs.Player_Play then
+			player:setMark(self:objectName(), 0)
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and event == sgs.EventPhaseEnd and player:getPhase() == sgs.Player_Play then
+			if player:getMark(self:objectName()) >= 2 then return self:objectName() end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local targets = sgs.SPlayerList()
+		for _, p in sgs.qlist(room:getAlivePlayers()) do
+			if p:isMale() then targets:append(p) end
+		end 
+		local target = room:askForPlayerChosen(player, targets, self:objectName(), self:objectName().."-invoke", true, true)
+		if target then
+			local target_data = sgs.QVariant()
+			target_data:setValue(target)
+			player:setTag(self:objectName(), target_data)
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local target = player:getTag(self:objectName()):toPlayer()
+		if target and target:isAlive() then
+			target:drawCards(2)
+		end
+		return false 
+	end,
+}
 
 --[[
 	业炎
