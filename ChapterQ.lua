@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（Q区）
 	技能索引：
-	奇才、奇策、戚乱、奇袭、千幻、潜袭、谦逊、强袭、琴音、倾城、倾国、青囊、巧变、驱虎    
+	奇才、奇策、戚乱、奇袭、千幻、潜袭、谦逊、强袭、琴音、倾城、倾国、青囊、巧变、樵拾、驱虎    
 ]]--
 --[[
 	奇才
@@ -568,13 +568,54 @@ luaQiaobian = sgs.CreateTriggerSkill{
 }
 
 --[[
+	樵拾
+	相关武将：身份-夏侯氏
+	描述：其他角色的结束阶段开始时，若其手牌数与你相等，你可以与其各摸一张牌。 
+	引用：
+	状态：2.0
+]]
+
+LuaQiaoshi = sgs.CreateTriggerSkill{
+	name = "LuaQiaoshi",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.EventPhaseStart},
+
+	can_trigger = function(self, event, room, player, data)
+		local trigger_list_skill, trigger_list_who = {}, {}
+		if player and player:isAlive() and player:getPhase() == sgs.Player_Finish then
+			for _, xiahoushi in sgs.qlist(room:findPlayersBySkillName(self:objectName())) do
+				if player:objectName() ~= xiahoushi:objectName() and player:getHandcardNum() == xiahoushi:getHandcardNum() then
+					table.insert(trigger_list_skill, self:objectName())
+					table.insert(trigger_list_who, xiahoushi:objectName())
+				end
+			end
+		end
+		return table.concat(trigger_list_skill, "|"), table.concat(trigger_list_who, "|")
+	end,
+	
+	on_cost = function(self, event, room, player, data, xiaohoushi)
+		if xiaohoushi:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), xiaohoushi)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data, xiaohoushi)
+		room:drawCards(xiaohoushi, 1, self:objectName())
+		room:drawCards(player, 1, self:objectName())
+		return false 
+	end,
+}
+
+--[[
 	驱虎
 	相关武将：标-荀彧
 	描述：出牌阶段限一次，你可以与一名体力值大于你的角色拼点。若你赢，该角色对其攻击范围内你选择的另一名角色造成1点伤害。若你没赢，该角色对你造成1点伤害。 
 	引用：
 	状态：
 ]]
-
 
 luaQuhuCard = sgs.CreateSkillCard{
 	name = "luaQuhuCard",
