@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（J区）
 	技能索引：
-	激昂、急救、急袭、激诏、集智、奸雄、奸雄·界限、节命、结姻、解烦·旧、精策、酒诗、据守、巨象  
+	激昂、急救、急袭、激诏、集智、奸雄、奸雄·界限、渐营、节命、结姻、解烦·旧、精策、酒诗、据守、巨象  
 ]]--
 --[[
 	激昂
@@ -196,6 +196,78 @@ LuaJianxiongJx = sgs.CreateTriggerSkill{
 		else
 			player:drawCards(1, self:objectName())
 		end
+		return false 
+	end,
+}
+
+--[[
+	渐营
+	相关武将：身份-沮授
+	描述：每当你于出牌阶段内使用一张牌时，若此牌与你本阶段使用的上一张牌花色或点数相同，你可摸一张牌。   
+	引用：
+	状态：2.0
+]]
+
+LuaJianying = sgs.CreateTriggerSkill{
+	name = "LuaJianying",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.EventPhaseStart, sgs.CardUsed, sgs.CardResponded},
+
+	on_record = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:getPhase() == sgs.Player_Play) then return end
+		if event == sgs.CardUsed or event == sgs.CardResponded then
+			local card
+			if event == sgs.CardUsed then
+				card = data:toCardUse().card
+			elseif event == sgs.CardResponded then
+				local response = data:toCardResponse()
+				card = response.m_isUse and response.m_card
+			end
+			if card and card:getHandlingMethod() == sgs.Card_MethodUse and card:getTypeId() ~= sgs.Card_TypeSkill then
+				local re_card = player:getTag(self:objectName()):toCard()
+				if re_card then
+					if re_card:getSuit() == card:getSuit() or re_card:getNumber() == card:getNumber() then
+						card:setFlags(self:objectName().."_can")
+					end
+				end
+				local card_data = sgs.QVariant()
+				card_data:setValue(card)
+				player:setTag(self:objectName(), card_data)
+			end
+		elseif event == sgs.EventPhaseStart then
+			player:removeTag(self:objectName())
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) then
+			if event == sgs.CardUsed or event == sgs.CardResponded then
+				local card
+				if event == sgs.CardUsed then
+					card = data:toCardUse().card
+				elseif event == sgs.CardResponded then
+					local response = data:toCardResponse()
+					card = response.m_isUse and response.m_card
+				end
+				if card and card:hasFlag(self:objectName().."_can") then
+					return self:objectName()
+				end
+			end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		player:drawCards(1)
 		return false 
 	end,
 }
