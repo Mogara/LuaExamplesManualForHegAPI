@@ -197,6 +197,9 @@ luaQiangxi = sgs.CreateViewAsSkill{
 	描述：出牌阶段开始时，你可以展示一名其他角色的一张手牌：若如此做，每当你于此阶段内使用与此牌类别相同的牌时，你可以摸一张牌。
 	引用：
 	状态：2.0
+	相关翻译 {
+		["LuaQiangzhi-invoke"] = "你可以发动“强识”<br/> <b>操作提示</b>: 选择一名有手牌的其他角色→点击确定<br/>",
+	}
 ]]
 
 LuaQiangzhi = sgs.CreateTriggerSkill{

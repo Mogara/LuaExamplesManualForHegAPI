@@ -123,6 +123,9 @@ LuaXiaoji = sgs.CreateTriggerSkill{
 	描述：一名其他角色的出牌阶段开始时，你可以摸两张牌：若如此做，你交给其两张牌；且本阶段结束后，若该角色未于本阶段杀死过一名角色，你失去1点体力。 
 	引用：
 	状态：2.0
+	相关翻译 {
+		["@LuaXiantu-give"] = "献图：请交给 %dest %arg 张牌",
+	}
 ]]
 
 LuaXiantu = sgs.CreateTriggerSkill{
