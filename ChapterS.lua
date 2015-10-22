@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（S区）
 	技能索引：
-	尚义、涉猎、神速、慎行、神智、生息、守成、授钺、淑慎、双刃、双雄、死谏、随势  
+	尚义、涉猎、神速、慎行、神智、生息、失北、守成、授钺、淑慎、双刃、双雄、死谏、随势  
 ]]--
 --[[
 	尚义
@@ -317,6 +317,64 @@ LuaShenzhi = sgs.CreatePhaseChangeSkill{
 	引用：
 	状态：
 ]]
+
+--[[
+	失北
+	相关武将：身份-沮授
+	描述：锁定技，每当你于一名角色的回合内受到伤害后，若为你本回合第一次受到伤害，你回复1点体力，否则你失去1点体力。
+	引用：
+	状态：2.0
+]]
+
+LuaShibei = sgs.CreateTriggerSkill{
+	name = "LuaShibei",
+	can_preshow = true,
+	frequency = sgs.Skill_Compulsory,
+	events = {sgs.Damaged, sgs.EventPhaseStart},
+	
+	on_record = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return end
+		if event == sgs.Damaged then
+			local current = room:getCurrent()
+			if current and current:isAlive() and current:getPhase() ~= sgs.Player_NotActive then
+				player:addMark(self:objectName().."_count")
+			end
+		elseif event == sgs.EventPhaseStart then
+			if player:getPhase() == sgs.Player_RoundStart then
+				for _, p in sgs.qlist(room:getAlivePlayers()) do
+					p:setMark(self:objectName().."_count", 0)
+				end
+			end
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName()) and event == sgs.Damaged) then return "" end
+		return self:objectName()
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if player:hasShownSkill(self:objectName()) or player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		room:sendCompulsoryTriggerLog(player, self:objectName(), true)
+		if player:getMark(self:objectName().."_count") == 1 then
+			local recover = sgs.RecoverStruct()
+			recover.recover = 1
+			recover.who = player
+			room:recover(player, recover)
+		else
+			room:loseHp(player)
+		end
+		return false 
+	end,
+}
+
 --[[
 	守成
 	相关武将：阵-蒋琬&费祎
