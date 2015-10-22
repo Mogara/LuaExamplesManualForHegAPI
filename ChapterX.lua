@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（X区）
 	技能索引：
-	享乐、骁果、枭姬、协穆、行殇、兴学、雄异、眩惑、恂恂
+	享乐、骁果、枭姬、献图、协穆、行殇、兴学、雄异、眩惑、恂恂
 ]]--
 --[[
 	享乐
@@ -114,6 +114,81 @@ LuaXiaoji = sgs.CreateTriggerSkill{
 	end,
 	on_effect = function(self,event,room,sunshangxiang,data)
         sunshangxiang:drawCards(2)
+	end,
+}
+
+--[[
+	献图
+	相关武将：身份-张松
+	描述：一名其他角色的出牌阶段开始时，你可以摸两张牌：若如此做，你交给其两张牌；且本阶段结束后，若该角色未于本阶段杀死过一名角色，你失去1点体力。 
+	引用：
+	状态：2.0
+]]
+
+LuaXiantu = sgs.CreateTriggerSkill{
+	name = "LuaXiantu",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.EventPhaseStart, sgs.EventPhaseEnd, sgs.Death},
+	
+	on_record = function(self, event, room, player, data)
+		if event == sgs.Death then
+			local death = data:toDeath()
+			if death.damage and death.damage.from then
+				death.damage.from:setFlags(self:objectName().."_loseHp")
+			end
+		elseif event == sgs.EventPhaseEnd and player:getPhase() == sgs.Player_Play then
+			for _, zhangsong in sgs.qlist(room:findPlayersBySkillName(self:objectName())) do
+				local to = zhangsong:getTag(self:objectName()):toPlayer()
+				zhangsong:removeTag(self:objectName())
+				if to and to:objectName() == player:objectName() then
+					if not player:hasFlag(self:objectName().."_loseHp") then
+						room:broadcastSkillInvoke(self:objectName(), 2, zhangsong)
+						room:sendCompulsoryTriggerLog(zhangsong, self:objectName(), true)
+						room:loseHp(zhangsong)
+					end
+				end
+			end
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and event == sgs.EventPhaseStart and player:getPhase() == sgs.Player_Play) then return "" end
+
+		local trigger_list_skill, trigger_list_who = {}, {}
+		for _, zhangsong in sgs.qlist(room:findPlayersBySkillName(self:objectName())) do
+			if zhangsong:objectName() ~= player:objectName() then
+				table.insert(trigger_list_skill, self:objectName())
+				table.insert(trigger_list_who, zhangsong:objectName())
+			end
+		end
+		return table.concat(trigger_list_skill, "|"), table.concat(trigger_list_who, "|")
+	end,
+	
+	on_cost = function(self, event, room, player, data, zhangsong)
+		local to_data = sgs.QVariant()
+		to_data:setValue(player)
+		if zhangsong:askForSkillInvoke(self:objectName(), to_data) then
+			room:broadcastSkillInvoke(self:objectName(), 1, zhangsong)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data, zhangsong)
+		zhangsong:drawCards(2)
+		local to_data = sgs.QVariant()
+		to_data:setValue(player)
+		zhangsong:setTag(self:objectName(), to_data)
+		if zhangsong:isAlive() and not zhangsong:isNude() then
+			local num = math.min(2, zhangsong:getCardCount(true))
+			local card = room:askForExchange(zhangsong, self:objectName(), num, num, "@"..self:objectName().."-give::"..player:objectName()..":"..num, "", ".")	
+			local dummy = sgs.Sanguosha:cloneCard("jink")
+			dummy:addSubcards(card:getSubcards())
+			room:obtainCard(player, dummy)
+			dummy:deleteLater()
+		end
+		return false 
 	end,
 }
 
