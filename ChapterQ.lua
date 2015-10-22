@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（Q区）
 	技能索引：
-	奇才、奇策、戚乱、奇袭、千幻、潜袭、谦逊、强袭、琴音、倾城、倾国、青囊、巧变、樵拾、驱虎    
+	奇才、奇策、戚乱、奇袭、千幻、潜袭、谦逊、强袭、强识、琴音、倾城、倾国、青囊、巧变、樵拾、驱虎    
 ]]--
 --[[
 	奇才
@@ -188,6 +188,84 @@ luaQiangxi = sgs.CreateViewAsSkill{
 	end, 
 	enabled_at_play = function(self, player)
 		return not player:hasUsed("#luaQiangxiCard")
+	end,
+}
+
+--[[
+	强识
+	相关武将：身份-张松
+	描述：出牌阶段开始时，你可以展示一名其他角色的一张手牌：若如此做，每当你于此阶段内使用与此牌类别相同的牌时，你可以摸一张牌。
+	引用：
+	状态：2.0
+]]
+
+LuaQiangzhi = sgs.CreateTriggerSkill{
+	name = "LuaQiangzhi",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent, 
+	events = {sgs.EventPhaseStart, sgs.CardUsed, sgs.CardResponded},
+
+	on_record = function(self, event, room, player, data)
+		if player and player:isAlive() and event == sgs.EventPhaseStart and player:getPhase() == sgs.Player_Play then
+			player:setMark(self:objectName(), 0)
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Play then
+			if event == sgs.EventPhaseStart then
+				return self:objectName()
+			elseif event == sgs.CardUsed or event == sgs.CardResponded then
+				local card
+				if event == sgs.CardUsed then
+					card = data:toCardUse().card
+				elseif event == sgs.CardResponded then
+					local response = data:toCardResponse()
+					card = response.m_isUse and response.m_card
+				end
+				if card and card:getHandlingMethod() == sgs.Card_MethodUse and card:getTypeId() ~= sgs.Card_TypeSkill then
+					if card:getTypeId() == player:getMark(self:objectName()) then return self:objectName() end
+				end
+			end
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		if event == sgs.EventPhaseStart then
+			local targets = sgs.SPlayerList()
+			for _, p in sgs.qlist(room:getOtherPlayers(player)) do
+				if not p:isKongcheng() then targets:append(p) end
+			end
+			if targets:length() == 0 then return false end
+			local to = room:askForPlayerChosen(player, targets, self:objectName(), self:objectName().."-invoke", true, true)
+			if to then
+				room:broadcastSkillInvoke(self:objectName(), player)
+				local to_data = sgs.QVariant()
+				to_data:setValue(to)
+				player:setTag(self:objectName(), to_data)
+				return true 
+			end
+		elseif player:hasShownSkill(self:objectName()) or player:askForSkillInvoke(self:objectName(), data) then
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		if event == sgs.EventPhaseStart then
+			local to = player:getTag(self:objectName()):toPlayer()
+			if to and to:isAlive() then
+				local id = room:askForCardChosen(player, to, "h", self:objectName(), false, sgs.Card_MethodNone)
+				room:showCard(to, id)
+				player:setMark(self:objectName(), sgs.Sanguosha:getCard(id):getTypeId())
+			end
+		else
+			room:sendCompulsoryTriggerLog(player, self:objectName(), true)
+			player:drawCards(1)
+		end
+		return false 
 	end,
 }
 
