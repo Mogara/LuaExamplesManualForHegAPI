@@ -342,11 +342,76 @@ LuaZiliang = sgs.CreateTriggerSkill{
 }
 
 --[[
+	忠勇
+	相关武将：身份-周仓
+	描述：每当你于出牌阶段内使用【杀】被【闪】抵消后，你可以令除目标角色外的一名角色获得弃牌堆中的此次使用的【闪】：若该角色不为你，你可以对同一目标角色再使用一张【杀】（无距离限制且不能选择额外目标）。
+	引用：
+	状态：2.0
+	相关翻译 {
+		["LuaZhongyong-invoke"] = "你可以发动“忠勇”<br/>操作提示: 选择除 %src 外的一名角色→确定",
+		["LuaZhongyong-slash"] = "忠勇：你可以对 %src 再使用一张【杀】",
+	}
+]]
+
+LuaZhongyong = sgs.CreateTriggerSkill{
+	name = "LuaZhongyong",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.SlashMissed,
+
+	can_trigger = function(self, event, room, player, data)
+		local effect = data:toSlashEffect()
+		if not (player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Play and effect.jink) then return "" end
+		local jink, ids = effect.jink, {}
+		if jink:isVirtualCard() then
+			for _, id in sgs.qlist(jink:getSubcards()) do
+				if room:getCardPlace(id) == sgs.Player_DiscardPile then table.insert(ids, id) end
+			end
+		else
+			if room:getCardPlace(jink:getEffectiveId()) == sgs.Player_DiscardPile then table.insert(ids, jink:getEffectiveId()) end
+		end
+		if #ids > 0 then
+			player:setTag(self:objectName().."_jink", sgs.QVariant(table.concat(ids, ",")))
+			return self:objectName()
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local effect = data:toSlashEffect()
+		local target = room:askForPlayerChosen(player, room:getOtherPlayers(effect.to), self:objectName(), self:objectName().."-invoke:"..effect.to:objectName(), true, true)
+		if target then
+			local target_data = sgs.QVariant()
+			target_data:setValue(target)
+			player:setTag(self:objectName(), target_data)
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local ids = player:getTag(self:objectName().."_jink"):toString():split(",")
+		local target = player:getTag(self:objectName()):toPlayer()
+		local dummy = sgs.Sanguosha:cloneCard("jink")
+		dummy:deleteLater()
+		for _, id in ipairs(ids) do dummy:addSubcard(id) end
+		room:obtainCard(target, dummy)
+		local effect = data:toSlashEffect()
+		if target:objectName() ~= player:objectName() and player:isAlive() and effect.to:isAlive() and player:canSlash(effect.to, nil, false) then
+			if room:askForUseSlashTo(player, effect.to, self:objectName().."-slash:"..effect.to:objectName(), false, true) then return true end
+		end
+		return false 
+	end,
+}
+
+
+--[[
 	纵玄
 	相关武将：身份-虞翻
 	描述：每当你的牌因弃置而置入弃牌堆前，你可以将其中至少一张牌以任意顺序置于牌堆顶。
 	引用：
-	状态：1.2.0 验证通过
+	状态：2.0 验证通过
 	备注：
 	相关翻译 {
 		["@LuaZongxuan"] = "请选择至少一张牌置于牌堆顶", 
