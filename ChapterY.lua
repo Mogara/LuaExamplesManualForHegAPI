@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（Y区）
 	技能索引：
-	燕语、业炎、疑城、遗计、遗志、英魂、鹰扬、英姿、勇决 
+	燕语、业炎、疑城、遗计、遗志、英魂、鹰扬、英姿、勇决、诱敌
 ]]--
 
 --[[
@@ -452,3 +452,51 @@ LuaYingzi = sgs.CreateDrawCardsSkill{
 	引用：
 	状态：
 ]]
+
+--[[
+	诱敌
+	相关武将：身份-朱桓
+	描述：结束阶段开始时，你可以令一名其他角色弃置你一张牌：若此牌不为【杀】，你获得其一张牌。
+	引用：
+	状态：2.0
+	相关翻译 {
+		["LuaYoudi-invoke"] = "你可以发动“诱敌”<br/>操作提示：选择一名其他角色→确定"
+	}
+]]
+
+LuaYoudi = sgs.CreateTriggerSkill{
+	name = "LuaYoudi",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = sgs.EventPhaseStart,
+
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName()) and player:getPhase() == sgs.Player_Finish and not player:isNude()) then return "" end
+		return self:objectName()
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local target = room:askForPlayerChosen(player, room:getOtherPlayers(player), self:objectName(), self:objectName().."-invoke", true, true)
+		if target then
+			local target_data = sgs.QVariant()
+			target_data:setValue(target)
+			player:setTag(self:objectName(), target_data)
+			room:broadcastSkillInvoke(self:objectName(), player)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data)
+		local target = player:getTag(self:objectName()):toPlayer()
+		if target and target:isAlive() and target:canDiscard(player, "he") then
+			local id = room:askForCardChosen(target, player, "he", self:objectName(), false, sgs.Card_MethodDiscard)
+			room:throwCard(id, player, target, self:objectName())
+			if not sgs.Sanguosha:getCard(id):isKindOf("Slash") and not target:isNude() and player:isAlive() then
+				local id2 = room:askForCardChosen(player, target, "he", self:objectName(), false, sgs.Card_MethodNone)
+				room:obtainCard(player, id2, false)
+			end
+		end
+		return false 
+	end,
+}
