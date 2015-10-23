@@ -177,10 +177,10 @@ LuaDingpin = sgs.CreateTriggerSkill{
 			end
 		elseif event == sgs.EventPhaseChanging then
 			local change = data:toPhaseChange()
-			if change.to == sgs.Player_RoundStart then
+			if change.to == sgs.Player_Play then
 				room:setPlayerProperty(player, self:objectName().."_pattern", sgs.QVariant())
 				for _, p in sgs.qlist(room:getAlivePlayers()) do
-					if p:hasFlag(self:objectName().."black") then room:setPlayerFlag(p, "-"..self:getSkillName().."black") end
+					if p:hasFlag(self:objectName().."black") then room:setPlayerFlag(p, "-"..self:objectName().."black") end
 				end
 			end
 		end
