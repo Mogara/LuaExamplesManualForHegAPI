@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（D区）
 	技能索引：
-	缔盟、短兵、断肠、断粮、断绁、度势
+	缔盟、定品、短兵、断肠、断粮、断绁、度势
 ]]--
 
 --[[
@@ -73,6 +73,121 @@ LuaDimeng = sgs.CreateViewAsSkill{
 	end ,
 	enabled_at_play = function(self, player)
 		return not player:hasUsed("#LuaDimengCard")
+	end
+}
+
+--[[
+	定品
+	相关武将：身份-陈群
+	描述：出牌阶段，你可以弃置一张与你本回合已使用或弃置的牌类别均不同的手牌，然后令一名已受伤的角色进行判定：若结果为黑色，该角色摸X张牌，且你本阶段不能对该角色发动“定品”；红色，你将武将牌翻面。（X为该角色已损失的体力值）。 
+	引用：
+	状态：2.0
+]]
+
+LuaDingpinCard = sgs.CreateSkillCard{
+	name = "LuaDingpinCard",
+	skill_name = "LuaDingpin",
+	target_fixed = false,
+	will_throw = true,
+	handling_method = sgs.Card_MethodNone,
+
+	filter = function(self, targets, to_select, player)
+		return #targets == 0 and to_select:isWounded() and not to_select:hasFlag(self:getSkillName().."black")
+	end,
+	
+	feasible = function(self, targets, player)
+		return #targets == 1
+	end,
+
+	on_use = function(self, room, source, targets)
+		local target = targets[1]
+		local Judge = sgs.JudgeStruct()
+		Judge.pattern = ".|black"
+		Judge.play_animation = false
+		Judge.reason = self:getSkillName()
+		Judge.who = target
+		room:judge(Judge)
+		if Judge:isGood() then
+			room:setPlayerFlag(target, self:getSkillName().."black")
+			room:drawCards(target, target:getLostHp(), self:getSkillName())
+		else
+			source:turnOver()
+		end
+	end,
+}
+
+LuaDingpinVS = sgs.CreateViewAsSkill{   
+	name = "LuaDingpin",
+	
+	view_filter = function(self, selected, to_select)
+		if to_select:isEquipped() or sgs.Self:isJilei(to_select) then return false end
+		local patterns, pattern = sgs.Self:property(self:objectName().."_pattern"):toString():split("+"), ""
+		for _, pat in ipairs(patterns) do
+			if to_select:getTypeId() == tonumber(pat) then return false end
+		end
+		return #selected == 0
+	end, 
+
+	view_as = function(self, originalCards) 
+		if #originalCards == 1 then
+			local skillcard = LuaDingpinCard:clone()
+			skillcard:addSubcard(originalCards[1])
+			skillcard:setSkillName(self:objectName())
+			skillcard:setShowSkill(self:objectName())
+			return skillcard
+		end
+	end, 
+
+	enabled_at_play = function(self, player)
+		return true
+	end,
+}
+
+LuaDingpin = sgs.CreateTriggerSkill{
+	name = "LuaDingpin",
+	events = {sgs.EventPhaseChanging, sgs.PreCardUsed, sgs.CardResponded, sgs.BeforeCardsMove},
+	view_as_skill = LuaDingpinVS,
+	
+	on_record = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return end
+		if event == sgs.PreCardUsed or event == sgs.CardResponded then
+			local card
+			if event == sgs.PreCardUsed then
+				card = data:toCardUse().card
+			elseif event == sgs.CardResponded then
+				local response = data:toCardResponse()
+				card = response.m_isUse and response.m_card
+			end
+			if card and card:getHandlingMethod() == sgs.Card_MethodUse and card:getTypeId() ~= sgs.Card_TypeSkill then
+				local patterns = player:property(self:objectName().."_pattern"):toString():split("+")
+				table.insert(patterns, tostring(card:getTypeId()))
+				table.toSet(patterns)
+				room:setPlayerProperty(player, self:objectName().."_pattern", sgs.QVariant(table.concat(patterns, "+")))
+			end
+		elseif event == sgs.BeforeCardsMove then
+			local move = data:toMoveOneTime()
+			if not move.from or move.from:objectName() ~= player:objectName() then return end
+			if bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
+				local patterns = player:property(self:objectName().."_pattern"):toString():split("+")
+				for _, id in sgs.qlist(move.card_ids) do
+					table.insert(patterns, tostring(sgs.Sanguosha:getCard(id):getTypeId()))
+				end
+				table.toSet(patterns)
+				room:setPlayerProperty(player, self:objectName().."_pattern", sgs.QVariant(table.concat(patterns, "+")))
+			end
+		elseif event == sgs.EventPhaseChanging then
+			local change = data:toPhaseChange()
+			if change.to == sgs.Player_RoundStart then
+				room:setPlayerProperty(player, self:objectName().."_pattern", sgs.QVariant())
+				for _, p in sgs.qlist(room:getAlivePlayers()) do
+					if p:hasFlag(self:objectName().."black") then room:setPlayerFlag(p, "-"..self:getSkillName().."black") end
+				end
+			end
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		return false
 	end
 }
 
