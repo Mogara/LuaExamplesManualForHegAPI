@@ -1,8 +1,49 @@
 --[[
 	国战技能速查手册（F区）
 	技能索引：
-	反间、反馈、反馈·界限、放权、放逐、奋命、奋迅、锋矢
+	法恩、反间、反馈、反馈·界限、放权、放逐、奋命、奋迅、锋矢
 ]]--
+
+--[[
+	法恩
+	相关武将：身份-陈群
+	描述：每当一名角色的武将牌翻面或横置时，你可以令其摸一张牌。
+	引用：
+	状态：2.0
+]]
+
+LuaFaen = sgs.CreateTriggerSkill{
+	name = "LuaFaen",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.TurnedOver, sgs.ChainStateChanged},
+
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return "" end
+		if event == sgs.ChainStateChanged and not player:isChained() then return "" end
+		local trigger_list_skill, trigger_list_who = {}, {}
+		for _, chenqun in sgs.qlist(room:findPlayersBySkillName(self:objectName())) do
+			table.insert(trigger_list_skill, self:objectName())
+			table.insert(trigger_list_who, chenqun:objectName())
+		end
+		return table.concat(trigger_list_skill, "|"), table.concat(trigger_list_who, "|")
+	end,
+	
+	on_cost = function(self, event, room, player, data, chenqun)
+		local to_data = sgs.QVariant()
+		to_data:setValue(player)
+		if chenqun:askForSkillInvoke(self:objectName(), to_data) then
+			room:broadcastSkillInvoke(self:objectName(), chenqun)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data, chenqun)
+		room:drawCards(player, 1, self:objectName())
+		return false 
+	end,
+}
 
 --[[
 	反间
