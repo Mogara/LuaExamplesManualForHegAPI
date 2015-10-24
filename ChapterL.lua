@@ -207,7 +207,7 @@ LuaLirang = sgs.CreateTriggerSkill{
 	
 	on_record = function(self, event, room, player, data)
 		if not (player and player:isAlive()) then return end
-		if not player:hasSkill(self:objectName()) then player:removeTag("luoyingCards_strings") return end
+		if not player:hasSkill(self:objectName()) then player:removeTag("LuaLirang_strings") return end
 
 		local move = data:toMoveOneTime()
 		if not move.from or move.from:objectName() ~= player:objectName() then return false end
@@ -234,7 +234,7 @@ LuaLirang = sgs.CreateTriggerSkill{
 		if not (player and player:isAlive() and player:hasSkill(self:objectName())) then return "" end
 
 		local move = data:toMoveOneTime()
-		if not move.from or move.from:objectName() ~= player:objectName() then return false end
+		if not move.from or move.from:objectName() ~= player:objectName() then return "" end
 
 		if bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
 			if move.from_places:contains(sgs.Player_PlaceTable) and move.to_place == sgs.Player_DiscardPile then
