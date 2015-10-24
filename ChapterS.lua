@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（S区）
 	技能索引：
-	尚义、涉猎、神速、慎行、神智、生息、失北、守成、授钺、淑慎、双刃、双雄、死谏、随势  
+	尚义、涉猎、神速、慎行、神智、生息、失北、守成、授钺、淑慎、双刃、双雄、司敌、死谏、随势  
 ]]--
 --[[
 	尚义
@@ -638,6 +638,106 @@ LuaShuangxiongGet = sgs.CreateTriggerSkill{
 	on_effect = function(self,room,event,player,data)
 		local judge = data:toJudge()
 		judge.who:obtainCard(judge.card)
+	end,
+}
+
+--[[
+	司敌
+	相关武将：身份-曹真
+	描述：当你使用或其他角色于你的回合内使用【闪】时，你可以将牌堆顶的一张牌置于武将牌上，称为“钤”；其他角色的出牌阶段开始时，你可以将一张“钤”牌置入弃牌堆。若如此做，该角色于此阶段内使用【杀】的次数上限-1。
+	引用：
+	状态：2.0
+	相关翻译 {
+		["@LuaSidi"] = "司敌：你可将一张“钤”置入弃牌堆，令 %src 此阶段使用【杀】的次数上限-1",
+		["qian"] = "钤",
+	}
+]]
+
+LuaSidi = sgs.CreateTriggerSkill{
+	name = "LuaSidi",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.CardResponded, sgs.EventPhaseStart, sgs.EventPhaseChanging},
+	
+	on_record = function(self, event, room, player, data)
+		if player and player:isAlive() and event == sgs.EventPhaseChanging then
+			local change = data:toPhaseChange()
+			if change.from == sgs.Player_Play then
+				room:setPlayerMark(player, self:objectName(), 0)
+			end
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if event == sgs.CardResponded then
+			local response = data:toCardResponse()
+			local card = response.m_isUse and response.m_card
+			if player and card and card:isKindOf("Jink") then
+				local current = room:getCurrent()
+				if current and current:isAlive() and player:objectName() ~= current:objectName() and current:getPhase() ~= sgs.Player_NotActive and current:hasSkill(self:objectName()) then 
+					return self:objectName(), current
+				end
+				if player:isAlive() and player:hasSkill(self:objectName()) then
+					return self:objectName()
+				end
+			end
+		elseif event == sgs.EventPhaseStart then
+			if player and player:isAlive() and player:getPhase() == sgs.Player_Play then
+				local trigger_list_skill, trigger_list_who = {}, {}
+				for _, caozhen in sgs.qlist(room:findPlayersBySkillName(self:objectName())) do
+					if caozhen:getPile("qian"):length() > 0 and player:objectName() ~= caozhen:objectName() then
+						table.insert(trigger_list_skill, self:objectName())
+						table.insert(trigger_list_who, caozhen:objectName())
+					end
+				end
+				return table.concat(trigger_list_skill, "|"), table.concat(trigger_list_who, "|")
+			end
+		end
+
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data, caozhen)
+		if event == sgs.CardResponded then
+			if caozhen:askForSkillInvoke(self:objectName(), data) then
+				room:broadcastSkillInvoke(self:objectName(), 1, caozhen)
+				return true 
+			end
+		elseif event == sgs.EventPhaseStart then
+			local card = room:askForExchange(caozhen, self:objectName(), 1, 0, "@"..self:objectName()..":"..player:objectName(), "qian", ".|.|.|qian")
+			if card then
+				local log = sgs.LogMessage()
+				log.type = "#InvokeSkill"
+				log.from = caozhen
+				log.arg = self:objectName()
+				room:sendLog(log)
+				room:broadcastSkillInvoke(self:objectName(), 2, caozhen)
+				local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_REMOVE_FROM_PILE, caozhen:objectName(), self:objectName(), "")
+				room:throwCard(card, reason, caozhen)
+				return true 
+			end
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data, caozhen)
+		if event == sgs.CardResponded then
+			local ids = room:getNCards(1, false)
+			local move = sgs.CardsMoveStruct(ids, caozhen, sgs.Player_PlaceTable, sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TURNOVER, caozhen:objectName(), self:objectName(), ""))
+			room:moveCardsAtomic(move, true)
+			caozhen:addToPile("qian", ids)
+		elseif event == sgs.EventPhaseStart then
+			room:addPlayerMark(player, self:objectName())
+		end
+		return false 
+	end,
+}
+
+LuaSidi_Mod = sgs.CreateTargetModSkill{
+	name = "#LuaSidi",
+	pattern = "Slash",
+	residue_func = function(self, player, card) 
+		return - player:getMark("LuaSidi")
 	end,
 }
 
