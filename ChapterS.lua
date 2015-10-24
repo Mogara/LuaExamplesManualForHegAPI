@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（S区）
 	技能索引：
-	尚义、涉猎、神速、慎行、神智、生息、失北、守成、授钺、淑慎、双刃、双雄、司敌、死谏、随势  
+	尚义、涉猎、神速、慎断、慎行、神智、生息、失北、守成、授钺、淑慎、双刃、双雄、司敌、死谏、随势  
 ]]--
 --[[
 	尚义
@@ -217,6 +217,109 @@ luaShensuSlash = sgs.CreateTargetModSkill{
 		else
 			return 0
 		end
+	end,
+}
+
+--[[
+	慎断
+	相关武将：身份-韩浩&史焕
+	描述：每当你的黑色基本牌因弃置而置入弃牌堆时，你可以将之当【兵粮寸断】使用（无距离限制）。
+	引用：
+	状态：2.0
+	相关翻译 {
+		["@LuaShenduan"] = "你可以发动“慎断”",
+		["~LuaShenduan"] = "选择“慎断”牌→选择【兵粮寸断】的目标（无距离限制）→确定",
+	}
+]]
+
+LuaShenduanVS = sgs.CreateOneCardViewAsSkill{   
+	name = "LuaShenduan",
+	response_pattern = "@@LuaShenduan",
+	expand_pile = "#LuaShenduan",
+	filter_pattern = ".|.|.|$LuaShenduan",
+
+	view_as = function(self, originalCard)
+		local skillcard = sgs.Sanguosha:cloneCard("supply_shortage", sgs.Card_SuitToBeDecided, -1)
+		skillcard:addSubcard(originalCard)
+		skillcard:setSkillName(self:objectName())
+		skillcard:setShowSkill(self:objectName())
+		return skillcard
+	end,
+
+	enabled_at_play = function(self, player)
+		return false
+	end,
+}
+
+LuaShenduan = sgs.CreateTriggerSkill{
+	name = "LuaShenduan",
+	events = sgs.CardsMoveOneTime,
+	view_as_skill = LuaShenduanVS,
+	
+	on_record = function(self, event, room, player, data)
+		if not (player and player:isAlive()) then return end
+		if not player:hasSkill(self:objectName()) then player:removeTag(self:objectName().."Cards_strings") return end
+		local move = data:toMoveOneTime()
+		if move.from and move.from:objectName() == player:objectName() and move.to_place == sgs.Player_PlaceTable and bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
+			local card_ids = {}
+			for i = 0, move.card_ids:length()-1, 1 do
+				local card_id = move.card_ids:at(i)
+				local card = sgs.Sanguosha:getCard(card_id)
+				if card:isBlack() and card:isKindOf("BasicCard") and room:getCardPlace(card_id) == sgs.Player_PlaceTable and (move.from_places:at(i) == sgs.Player_PlaceHand or move.from_places:at(i) == sgs.Player_PlaceEquip) then
+					table.insert(card_ids, tostring(card_id))
+				end
+			end	
+			if #card_ids > 0 then
+				local Cards_strings = player:getTag(self:objectName().."Cards_strings"):toString()
+				Cards_strings = Cards_strings.."|"..table.concat(card_ids, "+")
+				player:setTag(self:objectName().."Cards_strings", sgs.QVariant(Cards_strings))
+			end
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if not (player and player:isAlive() and player:hasSkill(self:objectName())) then return "" end
+		local Cards_strings = player:getTag(self:objectName().."Cards_strings"):toString()
+		if Cards_strings == "" then return "" end
+		local move, strings_table  = data:toMoveOneTime(), Cards_strings:split("|")
+		if move.from and move.from:objectName() == player:objectName() and move.to_place == sgs.Player_DiscardPile and bit32.band(move.reason.m_reason, sgs.CardMoveReason_S_MASK_BASIC_REASON) == sgs.CardMoveReason_S_REASON_DISCARD then
+			local string, ids = strings_table[#strings_table], {}
+			for _, idstring in ipairs(string:split("+")) do	
+				if room:getCardPlace(tonumber(idstring)) == sgs.Player_DiscardPile then table.insert(ids, tonumber(idstring)) end
+			end
+			player:setTag(self:objectName().."_use", sgs.QVariant(table.concat(ids, "+")))
+			if #ids > 0 then return self:objectName() end
+		end
+	end,
+	
+	on_cost = function(self, event, room, player, data)
+		local Cards_strings = player:getTag(self:objectName().."Cards_strings"):toString():split("|")
+		table.remove(Cards_strings)
+		player:setTag(self:objectName().."Cards_strings", sgs.QVariant(table.concat(Cards_strings, "|")))
+
+		local to_use = sgs.IntList()
+		for _, id in ipairs(player:getTag(self:objectName().."_use"):toString():split("+")) do
+			to_use:append(tonumber(id))
+		end
+
+		repeat
+			room:notifyMoveToPile(player, to_use, self:objectName(), sgs.Player_DiscardPile, true, true)
+			local card = room:askForUseCard(player, "@@"..self:objectName(), "@"..self:objectName(), -1, sgs.Card_MethodUse)
+			room:notifyMoveToPile(player, to_use, self:objectName(), sgs.Player_DiscardPile, false, false)
+			if not card or card:getSubcards():length() == 0 then break end
+			for _, id in sgs.qlist(card:getSubcards()) do
+				to_use:removeOne(id)
+			end
+		until to_use:isEmpty() or not player:isAlive()
+		return false 
+	end,
+}
+
+LuaShenduan_Mod = sgs.CreateTargetModSkill{
+	name = "#LuaShenduan",
+	pattern = "SupplyShortage",
+	distance_limit_func = function(self, player, card) 
+		return card:getSkillName() == "LuaShenduan" and 10086 or 0
 	end,
 }
 
