@@ -1,7 +1,7 @@
 --[[
 	国战技能速查手册（Y区）
 	技能索引：
-	燕语、业炎、疑城、遗计、遗志、英魂、鹰扬、英姿、勇决、诱敌
+	燕语、业炎、疑城、遗计、遗志、英魂、鹰扬、英姿、勇决、勇略、诱敌
 ]]--
 
 --[[
@@ -452,6 +452,75 @@ LuaYingzi = sgs.CreateDrawCardsSkill{
 	引用：
 	状态：
 ]]
+
+--[[
+	勇略
+	相关武将：身份-韩浩&史焕
+	描述：每当你攻击范围内的一名角色的判定阶段开始时，你可以弃置其判定区的一张牌：若如此做，视为对该角色使用一张【杀】（无距离限制）：若此【杀】未造成伤害，此【杀】结算后你摸一张牌。
+	引用：
+	状态：2.0
+]]
+
+LuaYonglve = sgs.CreateTriggerSkill{
+	name = "LuaYonglve",
+	can_preshow = true,
+	frequency = sgs.Skill_Frequent,
+	events = {sgs.EventPhaseStart, sgs.PreDamageDone, sgs.CardFinished},
+	
+	on_record = function(self, event, room, player, data)
+		if event == sgs.PreDamageDone then
+			local damage = data:toDamage()
+			if damage.card and damage.card:getSkillName() == self:objectName() then
+				damage.card:setFlags(self:objectName().."_damage")
+			end
+		elseif event == sgs.CardFinished then
+			local use = data:toCardUse()
+			if use.card and use.card:getSkillName() == self:objectName() and not use.card:hasFlag(self:objectName().."_damage") then
+				for _, p in sgs.qlist(room:getAlivePlayers()) do
+					if use.card:hasFlag(self:objectName().."|"..p:objectName()) then
+						p:drawCards(1, self:objectName())
+					end
+				end
+			end
+		end
+	end,
+
+	can_trigger = function(self, event, room, player, data)
+		if player and player:isAlive() and event == sgs.EventPhaseStart and player:getPhase() == sgs.Player_Judge then
+			local trigger_list_skill, trigger_list_who = {}, {}
+			for _, hanshi in sgs.qlist(room:findPlayersBySkillName(self:objectName())) do
+				if player:objectName() ~= hanshi:objectName() and hanshi:inMyAttackRange(player) and not player:getJudgingArea():isEmpty() then
+					table.insert(trigger_list_skill, self:objectName())
+					table.insert(trigger_list_who, hanshi:objectName())
+				end
+			end
+			return table.concat(trigger_list_skill, "|"), table.concat(trigger_list_who, "|")
+		end
+		return ""
+	end,
+	
+	on_cost = function(self, event, room, player, data, hanshi)
+		local to_data = sgs.QVariant()
+		to_data:setValue(player)
+		if hanshi:askForSkillInvoke(self:objectName(), to_data) then
+			room:broadcastSkillInvoke(self:objectName(), hanshi)
+			return true 
+		end
+		return false 
+	end,
+	
+	on_effect = function(self, event, room, player, data, hanshi)
+		local id = room:askForCardChosen(hanshi, player, "j", self:objectName(), false, sgs.Card_MethodDiscard)
+		room:throwCard(id, nil, hanshi)
+		if hanshi:isAlive() and player:isAlive() and hanshi:canSlash(player, false) then
+			local slash = sgs.Sanguosha:cloneCard("slash")
+			slash:setSkillName(self:objectName())
+			slash:setFlags(self:objectName().."|"..hanshi:objectName())
+			room:useCard(sgs.CardUseStruct(slash, hanshi, player))
+		end
+		return false 
+	end,
+}
 
 --[[
 	诱敌
