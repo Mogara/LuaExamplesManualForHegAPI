@@ -240,9 +240,134 @@ LuaFeiying = sgs.CreateTriggerSkill{
 	描述：君主技，此武将牌明置时，你获得“黄巾天兵符”。准备阶段开始时，若“黄巾天兵符”上没有牌，则从牌堆顶亮出X张牌置于“黄巾天兵符”上，称为“天兵”（X为全场存活的群势力角色数）。
 		★黄巾天兵符★
 		你执行的效果中的“群势力角色的数量”+X（X为不大于“天兵”数量的自然数）；每当你失去体力时，你可以防止此失去体力，将一张“天兵”置入弃牌堆；与你势力相同的角色可以将一张“天兵”当【杀】使用或打出。  
-	引用：
-	状态：
+	引用：LuaHongfa
+	状态：未测试
 ]]
+LuaHongfa = sgs.CreateTriggerSkill{
+	name = "LuaHongfa$",
+	events = {sgs.ConfirmPlayerNum, sgs.EventPhaseStart, sgs.PreHpLost, sgs.GeneralShown, sgs.GeneralHidden, sgs.GeneralRemoved, sgs.Death},
+	frequency = sgs.Skill_Compulsory,
+	can_trigger = function(self, event, room, player, data)
+		if event == sgs.ConfirmPlayerNum then
+			if not player or player:isDead() or not player:hasLordSkill(objectName()) then
+				return ""
+			end
+			if player:getPile("heavenly_army"):isEmpty() then
+				return ""
+			end
+			local player_num = sgs.PlayerNumStruct()
+			if player_num.m_toCalculate ~= "qun" then
+				return ""
+			end
+			return self:objectName()
+		elseif event == sgs.EventPhaseStart then
+			if not player or not player:isAlive() or not player:hasLordSkill(objectName()) then
+				return ""
+			end
+			if player:getPhase() ~= sgs.Player_Start then
+				return ""
+			end
+			if not player:getPile("heavenly_army"):isEmpty() then
+				return ""
+			end
+			return self:objectName()
+		elseif event == sgs.PreHpLost then
+			if not player or not player:isAlive() or not player:hasLordSkill(objectName()) then
+				return ""
+			end
+			if player:getPile("heavenly_army"):isEmpty() then
+				return ""
+			end
+			return self:objectName()
+		else
+			if player == nil then
+				return ""
+			end
+			if event == sgs.GeneralShown and player:hasShownGeneral1() then
+				if player and player:isAlive() and player:hasLordSkill(self:objectName()) then
+					for _, p in sgs.qlist(room:getAlivePlayers()) do
+						if p:willBeFriendWith(player) then
+							room:attachSkillToPlayer(p, "hongfa_slash")
+						end
+					end
+				else
+					local lord = room:getLord(player:getKingdom())
+					if lord and lord:isAlive() and lord:hasLordSkill(self:objectName())
+						room:attachSkillToPlayer(player, "hongfa_slash")
+					end
+				end
+			elseif player and player:isAlive() and player:hasLordSkill(self:objectName()) then
+				if event == sgs.Death then
+					local death = sgs.DeathStruct()
+					if death.who:objectName() ~= player:objectName() then
+						return ""
+					end
+				end
+				for _, p in sgs.qlist(room:getAlivePlayers()) do
+					room:detachSkillFromPlayer(p, "hongfa_slash")
+				end
+			end
+			return ""
+		end
+		return ""
+	end
+	on_cost = function(self, event, room, player, data)
+		if event == sgs.ConfirmPlayerNum then
+			local player_num = sgs.PlayerNumStruct()
+			if player_num.m_type == sgs.MaxCardsType_Max then
+				player_num.m_num == player_num.m_num + player:getPile("heavenly_army"):length()
+			elseif player_num.m_type == sgs.MaxCardsType_Normal then
+				local d = sgs.QVariant()
+				d:setValue(data)
+				player:setTag("LuaHongfaTianbingData", d)
+				local prompt = string.format("@LuaHongfa-tianbing:%1", player_num.m_reason)
+				local card = room:askForExchange(player, "LuaHongfa2", player:getPile("heavenly_army"):length(), 0, prompt,"heavenly_army")
+				player:removeTag("LuaHongfaTianbingData")
+				if card then
+					player:showGeneral(player:inHeadSkills(self:objectName()))
+					player_num.m_num = player_num.m_num + card:subcardsLength()
+					room:notifySkillInvoked(player, self:objectName())
+					room:broadcastSkillInvoke(self:objectName(),2)
+					card:deleteLater()
+				end
+			end
+			data:setValue(player_num)
+			return false
+		elseif event == sgs.EventPhaseStart then
+			return true
+		elseif event == sgs.PreHpLost then
+			player:removeTag("LuaHongfa_prevent")
+			local card = room:askForExchange(player, "LuaHongfa1", 1, 0, "@LuaHongfa-prevent", "heavenly_army")
+			if card then
+				room:notifySkillInvoked(player, self:objectName())
+				room:broadcastSkillInvoke(self:objectName(), 1)
+				local d = sgs.QVariant()
+				d:setValue(card:getEffectiveId())
+				player:setTag("LuaHongfa_prevent", d)
+				card:deleteLater()
+				return true
+			end
+		end
+		return false
+	end
+	on_effect = function(self, event, room, player, data)
+		if event == sgs.EventPhaseStart then
+			local num = player:getPlayerNumWithSameKingdom("LuaHongfa", QString(), sgs.MaxCardsType_Normal)
+			local tianbing = room:getNCards(num)
+			player:addToPile("heavenly_army", tianbing)
+			return false
+		else
+			local card_id = sgs.QList2Table(player:getTag("LuaHongfa_prevent"):toInt())
+			player:removeTag("LuaHongfa_prevent")
+			if card_id ~= -1 then
+				local reason(sgs.CardMoveReason_S_REASON_REMOVE_FROM_PILE, "", self:objectName(), "")
+				room:throwCard(sgs.Sanguosha:getCard(card_id), reason, nil)
+				return true
+			end
+		end
+		return false
+	end
+}
 --[[
 	红颜
 	相关武将：标-小乔
